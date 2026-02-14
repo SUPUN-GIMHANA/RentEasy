@@ -12,6 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Upload, X } from "lucide-react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
+import { api } from "@/lib/api-client"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
 export default function AddItemPage() {
   const router = useRouter()
@@ -21,10 +23,13 @@ export default function AddItemPage() {
     price: "",
     location: "",
     description: "",
-    availableFrom: "",
-    availableTo: "",
+    minimumRentalPeriod: "",
+    maximumRentalPeriod: "",
   })
-  const [uploadedImages, setUploadedImages] = useState<string[]>([])
+  const [uploadedImages, setUploadedImages] = useState<File[]>([])
+  const [imagePreview, setImagePreview] = useState<string[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState("")
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -45,48 +50,84 @@ export default function AddItemPage() {
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
     if (files) {
-      Array.from(files).forEach((file) => {
+      const newFiles = Array.from(files)
+      const newPreviews: string[] = []
+      
+      newFiles.forEach((file) => {
         const reader = new FileReader()
         reader.onload = (event) => {
           if (event.target?.result) {
-            setUploadedImages((prev) => [...prev, event.target.result as string])
+            newPreviews.push(event.target.result as string)
+            // Update preview when all files are read
+            if (newPreviews.length === newFiles.length) {
+              setImagePreview((prev) => [...prev, ...newPreviews])
+            }
           }
         }
         reader.readAsDataURL(file)
       })
+      
+      // Store actual File objects
+      setUploadedImages((prev) => [...prev, ...newFiles])
     }
   }
 
   const removeImage = (index: number) => {
     setUploadedImages((prev) => prev.filter((_, i) => i !== index))
+    setImagePreview((prev) => prev.filter((_, i) => i !== index))
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
-    // Create new item
-    const newItem = {
-      id: Date.now().toString(),
-      name: formData.name,
-      category: formData.category,
-      price: parseInt(formData.price),
-      location: formData.location,
-      description: formData.description,
-      status: "active",
-      views: 0,
-      image: uploadedImages[0] || "/placeholder.svg",
-      images: uploadedImages,
-      availableFrom: formData.availableFrom,
-      availableTo: formData.availableTo,
-    }
+    setError("")
+    setIsLoading(true)
 
-    // Store in localStorage
-    if (typeof window !== "undefined") {
-      const existingItems = JSON.parse(localStorage.getItem("rentalItems") || "[]")
-      localStorage.setItem("rentalItems", JSON.stringify([newItem, ...existingItems]))
-    }
+    try {
+      // Validate required fields with specific error messages
+      const missingFields: string[] = []
+      
+      if (!formData.name?.trim()) missingFields.push("Item Name")
+      if (!formData.category?.trim()) missingFields.push("Category")
+      if (!formData.price?.trim()) missingFields.push("Price")
+      if (!formData.location?.trim()) missingFields.push("Location")
+      if (!formData.description?.trim()) missingFields.push("Description")
+      
+      if (missingFields.length > 0) {
+        setError(`Missing required fields: ${missingFields.join(", ")}`)
+        setIsLoading(false)
+        return
+      }
 
-    router.push("/admin/items")
+      if (uploadedImages.length === 0) {
+        setError("Please upload at least one image")
+        setIsLoading(false)
+        return
+      }
+
+      // Create item data with File objects
+      const itemData = {
+        name: formData.name,
+        category: formData.category,
+        price: parseFloat(formData.price),
+        location: formData.location,
+        description: formData.description,
+        minimumRentalPeriod: formData.minimumRentalPeriod ? parseInt(formData.minimumRentalPeriod) : undefined,
+        maximumRentalPeriod: formData.maximumRentalPeriod ? parseInt(formData.maximumRentalPeriod) : undefined,
+        available: true,
+        imageFiles: uploadedImages, // Pass actual File objects
+      }
+
+      // Call API to save item
+      const response = await api.items.create(itemData)
+      
+      // Success - redirect to items management page
+      router.push("/admin/items")
+    } catch (err) {
+      console.error("Error creating item:", err)
+      setError(err instanceof Error ? err.message : "Failed to create item. Please try again.")
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -95,6 +136,12 @@ export default function AddItemPage() {
         <h1 className="text-3xl font-bold mb-2">Add New Item</h1>
         <p className="text-muted-foreground">Create a new rental listing with images and details</p>
       </div>
+
+      {error && (
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <Card className="transition-all duration-300 hover:shadow-lg">
@@ -173,26 +220,31 @@ export default function AddItemPage() {
 
             <div className="space-y-2">
               <Label>Upload Images *</Label>
-              <div
-                className="border-2 border-dashed rounded-lg p-8 text-center hover:bg-muted/50 transition-colors cursor-pointer"
-                onClick={() => fileInputRef.current?.click()}
+              
+              {/* Hidden file input */}
+              <input
+                ref={fileInputRef}
+                id="file-input"
+                type="file"
+                multiple
+                accept="image/*"
+                onChange={handleImageUpload}
+                style={{ display: "none" }}
+              />
+              
+              {/* Upload button/area */}
+              <label
+                htmlFor="file-input"
+                className="border-2 border-dashed rounded-lg p-8 text-center hover:bg-muted/50 transition-colors cursor-pointer active:bg-muted/70 block"
               >
                 <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
                 <p className="text-sm text-muted-foreground mb-1">Click to upload or drag and drop</p>
                 <p className="text-xs text-muted-foreground">PNG, JPG or WEBP (max. 5MB)</p>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  multiple
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  className="hidden"
-                />
-              </div>
+              </label>
 
-              {uploadedImages.length > 0 && (
+              {imagePreview.length > 0 && (
                 <div className="grid grid-cols-4 gap-4 mt-4">
-                  {uploadedImages.map((image, index) => (
+                  {imagePreview.map((image, index) => (
                     <div key={index} className="relative group">
                       <div className="relative h-24 w-full rounded-lg overflow-hidden bg-gray-100">
                         <Image src={image || "/placeholder.svg"} alt={`Preview ${index}`} fill className="object-cover" />
@@ -214,28 +266,32 @@ export default function AddItemPage() {
 
         <Card className="transition-all duration-300 hover:shadow-lg">
           <CardHeader>
-            <CardTitle>Availability</CardTitle>
+            <CardTitle>Rental Details</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="available-from">Available From</Label>
+                <Label htmlFor="minimum-rental">Minimum Rental Period (days)</Label>
                 <Input
-                  id="available-from"
-                  name="availableFrom"
-                  type="date"
-                  value={formData.availableFrom}
+                  id="minimum-rental"
+                  name="minimumRentalPeriod"
+                  type="number"
+                  placeholder="1"
+                  value={formData.minimumRentalPeriod}
                   onChange={handleInputChange}
+                  min="1"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="available-to">Available To</Label>
+                <Label htmlFor="maximum-rental">Maximum Rental Period (days)</Label>
                 <Input
-                  id="available-to"
-                  name="availableTo"
-                  type="date"
-                  value={formData.availableTo}
+                  id="maximum-rental"
+                  name="maximumRentalPeriod"
+                  type="number"
+                  placeholder="30"
+                  value={formData.maximumRentalPeriod}
                   onChange={handleInputChange}
+                  min="1"
                 />
               </div>
             </div>
@@ -243,13 +299,18 @@ export default function AddItemPage() {
         </Card>
 
         <div className="flex gap-4">
-          <Button type="submit" className="bg-[#2B70FF] hover:bg-[#1A4FCC]">
-            Create Listing
+          <Button 
+            type="submit" 
+            className="bg-[#2B70FF] hover:bg-[#1A4FCC]"
+            disabled={isLoading}
+          >
+            {isLoading ? "Creating..." : "Create Listing"}
           </Button>
           <Button
             type="button"
             variant="outline"
             onClick={() => router.back()}
+            disabled={isLoading}
           >
             Cancel
           </Button>

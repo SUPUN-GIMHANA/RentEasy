@@ -2,28 +2,12 @@
 
 import type React from "react"
 
-import { useAuth } from "@/lib/auth-context"
-import { useRouter } from "next/navigation"
-import { useEffect } from "react"
 import { AdminSidebar } from "@/components/admin-sidebar"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft } from "lucide-react"
 import Link from "next/link"
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated } = useAuth()
-  const router = useRouter()
-
-  useEffect(() => {
-    if (!isAuthenticated) {
-      router.push("/login")
-    }
-  }, [isAuthenticated, router])
-
-  if (!isAuthenticated) {
-    return null
-  }
-
   return (
     <div className="flex min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50">
       <AdminSidebar />

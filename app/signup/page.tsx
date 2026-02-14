@@ -9,25 +9,52 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useAuth } from "@/lib/auth-context"
 import Link from "next/link"
 import { Package } from "lucide-react"
 
 export default function SignupPage() {
-  const [name, setName] = useState("")
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
+  const [formData, setFormData] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+    phoneNumber: "",
+    address: "",
+    city: "",
+    country: "",
+  })
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState("")
   const { signup } = useAuth()
   const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
-    const success = await signup(name, email, password)
+    setError("")
+
+    if (formData.password !== formData.confirmPassword) {
+      setError("Passwords don't match")
+      setIsLoading(false)
+      return
+    }
+
+    if (formData.password.length < 6) {
+      setError("Password must be at least 6 characters")
+      setIsLoading(false)
+      return
+    }
+
+    const { confirmPassword, ...signupData } = formData
+    const success = await signup(signupData)
     setIsLoading(false)
     if (success) {
       router.push("/browse")
+    } else {
+      setError("Signup failed. Please try again.")
     }
   }
 
@@ -51,16 +78,32 @@ export default function SignupPage() {
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Full Name</Label>
-                  <Input
-                    id="name"
-                    type="text"
-                    placeholder="John Doe"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    required
-                  />
+                {error && (
+                  <Alert variant="destructive">
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="firstName">First Name</Label>
+                    <Input
+                      id="firstName"
+                      placeholder="John"
+                      value={formData.firstName}
+                      onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="lastName">Last Name</Label>
+                    <Input
+                      id="lastName"
+                      placeholder="Doe"
+                      value={formData.lastName}
+                      onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                      required
+                    />
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
@@ -68,21 +111,73 @@ export default function SignupPage() {
                     id="email"
                     type="email"
                     placeholder="you@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     required
                   />
                 </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="password">Password</Label>
+                    <Input
+                      id="password"
+                      type="password"
+                      placeholder="At least 6 characters"
+                      value={formData.password}
+                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="confirmPassword">Confirm</Label>
+                    <Input
+                      id="confirmPassword"
+                      type="password"
+                      placeholder="Confirm password"
+                      value={formData.confirmPassword}
+                      onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                      required
+                    />
+                  </div>
+                </div>
                 <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
+                  <Label htmlFor="phoneNumber">Phone (Optional)</Label>
                   <Input
-                    id="password"
-                    type="password"
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
+                    id="phoneNumber"
+                    type="tel"
+                    placeholder="+1234567890"
+                    value={formData.phoneNumber}
+                    onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
                   />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="address">Address (Optional)</Label>
+                  <Input
+                    id="address"
+                    placeholder="123 Main St"
+                    value={formData.address}
+                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="city">City (Optional)</Label>
+                    <Input
+                      id="city"
+                      placeholder="New York"
+                      value={formData.city}
+                      onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="country">Country (Optional)</Label>
+                    <Input
+                      id="country"
+                      placeholder="USA"
+                      value={formData.country}
+                      onChange={(e) => setFormData({ ...formData, country: e.target.value })}
+                    />
+                  </div>
                 </div>
                 <Button type="submit" className="w-full bg-[#FF8C00] hover:bg-[#CC7000]" disabled={isLoading}>
                   {isLoading ? "Creating Account..." : "Sign Up"}

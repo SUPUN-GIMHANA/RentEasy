@@ -8,6 +8,7 @@ import { FeaturedRentalCard } from "@/components/featured-rental-card"
 import { AdCarousel } from "@/components/ad-carousel"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
   Package,
   Shield,
@@ -23,8 +24,40 @@ import {
   Sparkles,
 } from "lucide-react"
 import Link from "next/link"
+import { useEffect, useState } from "react"
+import { api } from "@/lib/api-client"
+
+interface Item {
+  id: string
+  name: string
+  description: string
+  category: string
+  price: number
+  imageUrl?: string
+  location?: string
+  rating?: number
+  reviews?: number
+}
 
 export default function HomePage() {
+  const [featuredItems, setFeaturedItems] = useState<Item[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const loadFeaturedItems = async () => {
+      try {
+        setLoading(true)
+        const response = await api.items.getPopular(3)
+        setFeaturedItems(response || [])
+      } catch (error) {
+        console.error("Failed to load featured items:", error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadFeaturedItems()
+  }, [])
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -130,45 +163,72 @@ export default function HomePage() {
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <FeaturedRentalCard
-              id="1"
-              name="Luxury Toyota Camry 2023"
-              description="Comfortable sedan perfect for city drives and long trips. Features leather seats, GPS navigation, and excellent fuel economy."
-              price={8000}
-              imageUrl="/professional-camera-kit.jpg"
-              location="Colombo"
-              rating={4.8}
-              reviews={2}
-              owner="John Doe"
-              responseTime="< 1 hour"
-              features={["GPS Navigation", "Leather Seats", "Air Conditioning"]}
-            />
-            <FeaturedRentalCard
-              id="2"
-              name="Modern 2BR Apartment in Colombo"
-              description="Beautiful apartment with city view, fully furnished with modern amenities. Perfect for short-term stays."
-              price={15000}
-              imageUrl="/luxury-camping-tent-setup.jpg"
-              location="Colombo"
-              rating={4.9}
-              reviews={1}
-              owner="Sarah Wilson"
-              responseTime="< 30 min"
-              features={["WiFi", "Kitchen", "Washing Machine"]}
-            />
-            <FeaturedRentalCard
-              id="3"
-              name="Professional DSLR Camera Kit"
-              description="Canon EOS R5 with multiple lenses, tripod, and accessories. Perfect for photography and videography."
-              price={5000}
-              imageUrl="/professional-dj-sound-system.jpg"
-              location="Kandy"
-              rating={4.7}
-              reviews={1}
-              owner="Mike Johnson"
-              responseTime="< 2 hours"
-              features={["Multiple Lenses", "Tripod", "Memory Cards"]}
-            />
+            {loading ? (
+              <>
+                <Card><CardContent className="pt-6"><Skeleton className="h-48 w-full mb-4" /><Skeleton className="h-4 w-3/4 mb-2" /><Skeleton className="h-4 w-1/2" /></CardContent></Card>
+                <Card><CardContent className="pt-6"><Skeleton className="h-48 w-full mb-4" /><Skeleton className="h-4 w-3/4 mb-2" /><Skeleton className="h-4 w-1/2" /></CardContent></Card>
+                <Card><CardContent className="pt-6"><Skeleton className="h-48 w-full mb-4" /><Skeleton className="h-4 w-3/4 mb-2" /><Skeleton className="h-4 w-1/2" /></CardContent></Card>
+              </>
+            ) : featuredItems && featuredItems.length > 0 ? (
+              featuredItems.map((item) => (
+                <FeaturedRentalCard
+                  key={item.id}
+                  id={item.id}
+                  name={item.name}
+                  description={item.description}
+                  price={item.price}
+                  imageUrl={item.imageUrl || "/placeholder.svg"}
+                  location={item.location || "Unknown Location"}
+                  rating={item.rating || 4.5}
+                  reviews={0}
+                  owner="Rental Owner"
+                  responseTime="< 1 hour"
+                  features={[item.category]}
+                />
+              ))
+            ) : (
+              <>
+                <FeaturedRentalCard
+                  id="1"
+                  name="Luxury Toyota Camry 2023"
+                  description="Comfortable sedan perfect for city drives and long trips. Features leather seats, GPS navigation, and excellent fuel economy."
+                  price={8000}
+                  imageUrl="/professional-camera-kit.jpg"
+                  location="Colombo"
+                  rating={4.8}
+                  reviews={2}
+                  owner="John Doe"
+                  responseTime="< 1 hour"
+                  features={["GPS Navigation", "Leather Seats", "Air Conditioning"]}
+                />
+                <FeaturedRentalCard
+                  id="2"
+                  name="Modern 2BR Apartment in Colombo"
+                  description="Beautiful apartment with city view, fully furnished with modern amenities. Perfect for short-term stays."
+                  price={15000}
+                  imageUrl="/luxury-camping-tent-setup.jpg"
+                  location="Colombo"
+                  rating={4.9}
+                  reviews={1}
+                  owner="Sarah Wilson"
+                  responseTime="< 30 min"
+                  features={["WiFi", "Kitchen", "Washing Machine"]}
+                />
+                <FeaturedRentalCard
+                  id="3"
+                  name="Professional DSLR Camera Kit"
+                  description="Canon EOS R5 with multiple lenses, tripod, and accessories. Perfect for photography and videography."
+                  price={5000}
+                  imageUrl="/professional-dj-sound-system.jpg"
+                  location="Kandy"
+                  rating={4.7}
+                  reviews={1}
+                  owner="Mike Johnson"
+                  responseTime="< 2 hours"
+                  features={["Multiple Lenses", "Tripod", "Memory Cards"]}
+                />
+              </>
+            )}
           </div>
         </div>
       </section>

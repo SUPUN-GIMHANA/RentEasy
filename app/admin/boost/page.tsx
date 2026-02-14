@@ -91,24 +91,30 @@ export default function BoostAdvertisementPage() {
   const [selectedBoostModal, setSelectedBoostModal] = useState(false)
   const [paymentModal, setPaymentModal] = useState(false)
 
-  // Load added items from localStorage
+  // Load added items from localStorage (run once on mount)
   useEffect(() => {
     if (typeof window !== "undefined") {
       const addedItems = JSON.parse(localStorage.getItem("rentalItems") || "[]")
       if (addedItems.length > 0) {
-        // Add newly created items to available items
-        const newItems = addedItems.filter(
-          (item: any) =>
-            !initialAvailableItems.some((existing) => existing.id === item.id)
-        )
-        setAvailableItems((prev) => [...prev, ...newItems])
+        // Add newly created items to available items, avoiding duplicates
+        setAvailableItems((prev) => {
+          const existingIds = new Set(prev.map((item) => item.id))
+          const initialIds = new Set(initialAvailableItems.map((item) => item.id))
+          
+          const newItems = addedItems.filter(
+            (item: any) => !existingIds.has(item.id) && !initialIds.has(item.id)
+          )
+          return [...prev, ...newItems]
+        })
       }
+    }
+  }, [])
 
-      // Check for success message
-      if (searchParams.get("success")) {
-        setSuccessMessage("Boost activated successfully!")
-        setTimeout(() => setSuccessMessage(null), 5000)
-      }
+  // Check for success message from searchParams
+  useEffect(() => {
+    if (searchParams.get("success")) {
+      setSuccessMessage("Boost activated successfully!")
+      setTimeout(() => setSuccessMessage(null), 5000)
     }
   }, [searchParams])
 

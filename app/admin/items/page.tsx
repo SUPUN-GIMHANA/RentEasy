@@ -1,13 +1,14 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { Search, Edit, Trash2, Eye, EyeOff, AlertCircle } from "lucide-react"
+import { Search, Edit, Trash2, Eye, EyeOff, AlertCircle, Loader } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
+import { api } from "@/lib/api-client"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,45 +18,44 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import AddItemModal from "@/components/AddItemModal" // Import AddItemModal component
-import { handleAddItem, handleEditItem } from "@/utils/itemUtils"; // Declare the handleAddItem and handleEditItem variables
 
-const initialItems = [
-  {
-    id: "1",
-    name: "Professional Camera Kit",
-    category: "Electronics",
-    price: 5000,
-    status: "active" as const,
-    views: 567,
-    image: "/professional-camera-kit.jpg",
-  },
-  {
-    id: "2",
-    name: "Luxury Camping Tent",
-    category: "Camping",
-    price: 3000,
-    status: "active" as const,
-    views: 245,
-    image: "/luxury-camping-tent-setup.jpg",
-  },
-  {
-    id: "3",
-    name: "DJ Sound System",
-    category: "Events",
-    price: 12000,
-    status: "inactive" as const,
-    views: 189,
-    image: "/professional-dj-sound-system.jpg",
-  },
-]
+interface Item {
+  id: string
+  name: string
+  category: string
+  price: number
+  status: "ACTIVE" | "INACTIVE"
+  views?: number
+  imageUrl?: string
+  description?: string
+}
 
 export default function ManageItemsPage() {
-  const [items, setItems] = useState(initialItems)
+  const [items, setItems] = useState<Item[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
   const [searchQuery, setSearchQuery] = useState("")
   const [deleteItemId, setDeleteItemId] = useState<string | null>(null)
-  const [modalOpen, setModalOpen] = useState(false)
-  const [editingItem, setEditingItem] = useState<string | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+
+  useEffect(() => {
+    loadItems()
+  }, [])
+
+  const loadItems = async () => {
+    try {
+      setLoading(true)
+      setError("")
+      const response = await api.items.getMyItems()
+      setItems(response || [])
+    } catch (err) {
+      console.error("Failed to load items:", err)
+      setError("Failed to load items")
+      setItems([])
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const filteredItems = useMemo(() => {
     return items.filter(
@@ -65,29 +65,19 @@ export default function ManageItemsPage() {
     )
   }, [items, searchQuery])
 
-
-
-  const handleToggleStatus = (itemId: string) => {
-    setItems(
-      items.map((item) =>
-        item.id === itemId
-          ? { ...item, status: item.status === "active" ? "inactive" : "active" }
-          : item
-      )
-    )
-  }
-
-  const handleDeleteItem = (itemId: string) => {
-    setItems(items.filter((item) => item.id !== itemId))
-    setDeleteItemId(null)
-    if (typeof window !== "undefined") {
-      const existingItems = JSON.parse(localStorage.getItem("rentalItems") || "[]")
-      const updated = existingItems.filter((item: any) => item.id !== itemId)
-      localStorage.setItem("rentalItems", JSON.stringify(updated))
+  const handleDeleteItem = async (itemId: string) => {
+    setIsDeleting(true)
+    try {
+      await api.items.delete(itemId)
+      setItems(items.filter((item) => item.id !== itemId))
+      setDeleteItemId(null)
+    } catch (err) {
+      console.error("Failed to delete item:", err)
+      setError("Failed to delete item")
+    } finally {
+      setIsDeleting(false)
     }
   }
-
-
 
   return (
     <div className="space-y-6">
@@ -103,6 +93,25 @@ export default function ManageItemsPage() {
         </Link>
       </div>
 
+      {error && (
+        <Card className="bg-red-50 border-red-200">
+          <CardContent className="p-6 flex items-center gap-4">
+            <AlertCircle className="h-5 w-5 text-red-600" />
+            <div>
+              <p className="font-medium text-red-900">{error}</p>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={loadItems}
+                className="mt-2"
+              >
+                Retry
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="flex gap-4">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -113,88 +122,96 @@ export default function ManageItemsPage() {
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
-        <Button variant="outline">Filter</Button>
+        <Button variant="outline" onClick={loadItems}>
+          Refresh
+        </Button>
       </div>
 
-      {filteredItems.length === 0 && searchQuery && (
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader className="h-6 w-6 animate-spin text-[#2B70FF]" />
+          <span className="ml-2 text-muted-foreground">Loading items...</span>
+        </div>
+      ) : filteredItems.length === 0 ? (
         <Card className="bg-blue-50 border-blue-200">
           <CardContent className="p-6 flex items-center gap-4">
             <AlertCircle className="h-5 w-5 text-blue-600" />
             <div>
-              <p className="font-medium text-blue-900">No items found</p>
-              <p className="text-sm text-blue-700">Try adjusting your search query</p>
+              <p className="font-medium text-blue-900">
+                {searchQuery ? "No items found" : "No items yet"}
+              </p>
+              <p className="text-sm text-blue-700">
+                {searchQuery
+                  ? "Try adjusting your search query"
+                  : "Create your first rental item to get started"}
+              </p>
             </div>
           </CardContent>
         </Card>
-      )}
-
-      <div className="grid gap-4">
-        {filteredItems.map((item) => (
-          <Card
-            key={item.id}
-            className="transition-all duration-300 hover:shadow-lg"
-          >
-            <CardContent className="p-4">
-              <div className="flex items-center gap-4">
-                <div className="relative h-20 w-20 rounded-lg overflow-hidden flex-shrink-0">
-                  <Image
-                    src={item.image || "/placeholder.svg"}
-                    alt={item.name}
-                    fill
-                    className="object-cover"
-                  />
-                </div>
-                <div className="flex-1">
-                  <h3 className="font-semibold text-lg mb-1">{item.name}</h3>
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                    <span>{item.category}</span>
-                    <span>•</span>
-                    <span>LKR {item.price.toLocaleString()}/day</span>
-                    <span>•</span>
-                    <span>{item.views} views</span>
+      ) : (
+        <div className="grid gap-4">
+          {filteredItems.map((item) => (
+            <Card
+              key={item.id}
+              className="transition-all duration-300 hover:shadow-lg"
+            >
+              <CardContent className="p-4">
+                <div className="flex items-center gap-4">
+                  <div className="relative h-20 w-20 rounded-lg overflow-hidden flex-shrink-0 bg-gray-100">
+                    {item.imageUrl && (
+                      <Image
+                        src={item.imageUrl}
+                        alt={item.name}
+                        fill
+                        className="object-cover"
+                      />
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-lg mb-1">{item.name}</h3>
+                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                      <span>{item.category}</span>
+                      <span>•</span>
+                      <span>LKR {item.price.toLocaleString()}/day</span>
+                      {item.views && (
+                        <>
+                          <span>•</span>
+                          <span>{item.views} views</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge
+                      className={
+                        item.status === "ACTIVE"
+                          ? "bg-green-500 hover:bg-green-600"
+                          : "bg-red-500 hover:bg-red-600"
+                      }
+                    >
+                      {item.status === "ACTIVE" ? "Active" : "Inactive"}
+                    </Badge>
+                    <Link href={`/admin/edit-item/${item.id}`}>
+                      <Button variant="outline" size="icon">
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    </Link>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="text-destructive bg-transparent"
+                      onClick={() => setDeleteItemId(item.id)}
+                      disabled={isDeleting}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  {item.status === "active" ? (
-                    <Badge className="bg-green-500 hover:bg-green-600">Active</Badge>
-                  ) : (
-                    <Badge className="bg-red-500 hover:bg-red-600">Inactive</Badge>
-                  )}
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => handleToggleStatus(item.id)}
-                    title={
-                      item.status === "active"
-                        ? "Deactivate item"
-                        : "Activate item"
-                    }
-                  >
-                    {item.status === "active" ? (
-                      <Eye className="h-4 w-4" />
-                    ) : (
-                      <EyeOff className="h-4 w-4" />
-                    )}
-                  </Button>
-                  <Link href={`/admin/edit-item/${item.id}`}>
-                    <Button variant="outline" size="icon">
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                  </Link>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="text-destructive bg-transparent"
-                    onClick={() => setDeleteItemId(item.id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
 
       <AlertDialog open={deleteItemId !== null} onOpenChange={() => setDeleteItemId(null)}>
         <AlertDialogContent>
@@ -205,12 +222,13 @@ export default function ManageItemsPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="flex gap-4">
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => deleteItemId && handleDeleteItem(deleteItemId)}
               className="bg-destructive hover:bg-destructive/90"
+              disabled={isDeleting}
             >
-              Delete
+              {isDeleting ? "Deleting..." : "Delete"}
             </AlertDialogAction>
           </div>
         </AlertDialogContent>

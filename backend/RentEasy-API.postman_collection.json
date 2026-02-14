@@ -1,0 +1,185 @@
+{
+  "info": {
+    "name": "RentEasy API",
+    "description": "API endpoints for RentEasy rental platform",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Signup",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"password123\",\n  \"firstName\": \"John\",\n  \"lastName\": \"Doe\",\n  \"phoneNumber\": \"+1234567890\",\n  \"address\": \"123 Main St\",\n  \"city\": \"New York\",\n  \"country\": \"USA\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/auth/signup",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "auth", "signup"]
+            }
+          }
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/auth/login",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "auth", "login"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Items",
+      "item": [
+        {
+          "name": "Get All Items",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "http://localhost:8080/api/items?page=0&size=12",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "items"],
+              "query": [
+                {"key": "page", "value": "0"},
+                {"key": "size", "value": "12"}
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Item",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Camera Kit\",\n  \"description\": \"Professional camera with accessories\",\n  \"category\": \"Electronics\",\n  \"price\": 150.00,\n  \"imageUrl\": \"/images/camera.jpg\",\n  \"available\": true,\n  \"location\": \"New York\",\n  \"minimumRentalPeriod\": 1,\n  \"maximumRentalPeriod\": 30\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/items",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "items"]
+            }
+          }
+        },
+        {
+          "name": "Search Items",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "http://localhost:8080/api/items/search?query=camera&page=0&size=12",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "items", "search"],
+              "query": [
+                {"key": "query", "value": "camera"},
+                {"key": "page", "value": "0"},
+                {"key": "size", "value": "12"}
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Bookings",
+      "item": [
+        {
+          "name": "Create Booking",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"itemId\": \"item-id-here\",\n  \"startDate\": \"2026-02-20\",\n  \"endDate\": \"2026-02-22\",\n  \"deliveryAddress\": \"123 Main St, New York\",\n  \"specialInstructions\": \"Please deliver in the morning\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/bookings",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "bookings"]
+            }
+          }
+        },
+        {
+          "name": "Get My Bookings",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:8080/api/bookings/my-bookings",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "bookings", "my-bookings"]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}

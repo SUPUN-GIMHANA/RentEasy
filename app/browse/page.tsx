@@ -1,54 +1,104 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { Header } from "@/components/header"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
+import { Skeleton } from "@/components/ui/skeleton"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { mockItems } from "@/lib/mock-data"
-import { Search, SlidersHorizontal, Star } from "lucide-react"
+import { api } from "@/lib/api-client"
+import { Search, Star } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 
-const categories = ["Vehicles", "Properties", "Electronics", "Clothing", "Tools", "Sports", "Camping", "Events"]
+const categories = ["vehicles", "properties", "electronics", "clothing", "tools", "sports", "camping", "events"]
 
-const categorySubcategories: Record<string, string[]> = {
-  Vehicles: ["Cars", "Motorcycles", "Bicycles", "Trucks"],
-  Properties: ["Apartments", "Houses", "Villas", "Offices"],
-  Electronics: ["Cameras", "Gaming", "Audio", "Computers"],
-  Clothing: ["Formal", "Casual", "Sports", "Accessories"],
-  Tools: ["Power Tools", "Hand Tools", "Gardening", "Construction"],
-  Sports: ["Equipment", "Bikes", "Water Sports", "Winter Sports"],
-  Camping: ["Tents", "Sleeping Bags", "Cooking", "Navigation"],
-  Events: ["Decorations", "Sound Systems", "Lighting", "Tables & Chairs"],
+interface Item {
+  id: string
+  name: string
+  description: string
+  category: string
+  price: number
+  imageUrl: string
+  available: boolean
+  rating?: number
 }
 
 export default function BrowsePage() {
+  const [items, setItems] = useState<Item[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
+  const [page, setPage] = useState(0)
+  const [totalPages, setTotalPages] = useState(0)
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("all")
-  const [selectedSubcategory, setSelectedSubcategory] = useState("all")
   const [priceRange, setPriceRange] = useState("all")
   const [sortBy, setSortBy] = useState("name")
 
-  const filteredAndSortedItems = useMemo(() => {
-    const filtered = mockItems.filter((item) => {
-      const matchesSearch =
-        item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.description.toLowerCase().includes(searchQuery.toLowerCase())
-      const matchesCategory = selectedCategory === "all" || item.category === selectedCategory
-      const matchesSubcategory = selectedSubcategory === "all" || true // Placeholder for subcategory matching
+  useEffect(() => {
+    loadItems()
+  }, [page, selectedCategory])
 
+  const loadItems = async () => {
+    try {
+      setLoading(true)
+      setError("")
+      
+      let response
+      if (selectedCategory === "all") {
+        response = await api.items.getAll(page, 12)
+      } else {
+        response = await api.items.getByCategory(selectedCategory, page, 12)
+      }
+      
+      setItems(response.content || [])
+      setTotalPages(response.totalPages || 0)
+    } catch (error: any) {
+      console.error("Failed to load items:", error)
+      setError(error.message || "Failed to load items")
+      setItems([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleSearch = async () => {
+    if (!searchQuery.trim()) {
+      loadItems()
+      return
+    }
+
+    try {
+      setLoading(true)
+      setError("")
+      const response = await api.items.search(searchQuery, page, 12)
+      setItems(response.content || [])
+      setTotalPages(response.totalPages || 0)
+    } catch (error: any) {
+      console.error("Search failed:", error)
+      setError(error.message || "Search failed")
+      setItems([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const filteredAndSortedItems = useMemo(() => {
+    let filtered = [...items]
+
+    // Apply price filter
+    filtered = filtered.filter((item) => {
       let matchesPrice = true
       if (priceRange === "0-50") matchesPrice = item.price <= 50
       else if (priceRange === "51-100") matchesPrice = item.price > 50 && item.price <= 100
       else if (priceRange === "101-200") matchesPrice = item.price > 100 && item.price <= 200
       else if (priceRange === "201+") matchesPrice = item.price > 200
-
-      return matchesSearch && matchesCategory && matchesSubcategory && matchesPrice
+      return matchesPrice
     })
 
+    // Apply sorting
     filtered.sort((a, b) => {
       if (sortBy === "price-low") return a.price - b.price
       if (sortBy === "price-high") return b.price - a.price
@@ -59,7 +109,7 @@ export default function BrowsePage() {
     })
 
     return filtered
-  }, [searchQuery, selectedCategory, selectedSubcategory, priceRange, sortBy])
+  }, [items, priceRange, sortBy])
 
   return (
     <div className="min-h-screen bg-background">
@@ -73,7 +123,7 @@ export default function BrowsePage() {
           </p>
         </div>
 
-        {/* Filters */}
+        {/* Search and Filters */}
         <div className="mb-8 space-y-4">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1 relative">
@@ -82,54 +132,39 @@ export default function BrowsePage() {
                 placeholder="Search items..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyPress={(e) => e.key === "Enter" && handleSearch()}
                 className="pl-10"
               />
             </div>
-            <Button variant="outline" className="md:hidden bg-transparent">
-              <SlidersHorizontal className="h-4 w-4 mr-2" />
-              Filters
+            <Button onClick={handleSearch} className="md:w-auto">
+              <Search className="h-4 w-4 mr-2" />
+              Search
             </Button>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
-            <Select
-              value={selectedCategory}
-              onValueChange={(value) => {
-                setSelectedCategory(value)
-                setSelectedSubcategory("all")
-              }}
-            >
-              <SelectTrigger>
+          {error && (
+            <div className="p-4 bg-destructive/10 text-destructive rounded-md">
+              {error}
+            </div>
+          )}
+
+          <div className="flex flex-wrap gap-4">
+            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+              <SelectTrigger className="w-full md:w-[180px]">
                 <SelectValue placeholder="Category" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Categories</SelectItem>
-                {categories.map((category) => (
-                  <SelectItem key={category} value={category}>
-                    {category}
+                {categories.map((cat) => (
+                  <SelectItem key={cat} value={cat}>
+                    {cat.charAt(0).toUpperCase() + cat.slice(1)}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
 
-            {selectedCategory !== "all" && (
-              <Select value={selectedSubcategory} onValueChange={setSelectedSubcategory}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Subcategory" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Subcategories</SelectItem>
-                  {categorySubcategories[selectedCategory]?.map((sub) => (
-                    <SelectItem key={sub} value={sub}>
-                      {sub}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-
             <Select value={priceRange} onValueChange={setPriceRange}>
-              <SelectTrigger>
+              <SelectTrigger className="w-full md:w-[180px]">
                 <SelectValue placeholder="Price Range" />
               </SelectTrigger>
               <SelectContent>
@@ -142,100 +177,137 @@ export default function BrowsePage() {
             </Select>
 
             <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger>
-                <SelectValue placeholder="Rating" />
+              <SelectTrigger className="w-full md:w-[180px]">
+                <SelectValue placeholder="Sort By" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="name">Newest</SelectItem>
-                <SelectItem value="rating-high">Highest Rated</SelectItem>
-                <SelectItem value="rating-low">Lowest Rated</SelectItem>
+                <SelectItem value="name">Name</SelectItem>
                 <SelectItem value="price-low">Price: Low to High</SelectItem>
                 <SelectItem value="price-high">Price: High to Low</SelectItem>
+                <SelectItem value="rating-high">Rating: High to Low</SelectItem>
+                <SelectItem value="rating-low">Rating: Low to High</SelectItem>
               </SelectContent>
             </Select>
 
-            <Button
-              variant="outline"
+            <Button 
+              variant="outline" 
               onClick={() => {
                 setSearchQuery("")
                 setSelectedCategory("all")
-                setSelectedSubcategory("all")
                 setPriceRange("all")
                 setSortBy("name")
+                loadItems()
               }}
-              className="bg-transparent"
             >
               Reset
             </Button>
           </div>
         </div>
 
-        {/* Results */}
-        <div className="mb-4">
-          <p className="text-muted-foreground">
-            Showing {filteredAndSortedItems.length} of {mockItems.length} items
-          </p>
-        </div>
+        {/* Loading State */}
+        {loading && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {[...Array(8)].map((_, i) => (
+              <div key={i} className="space-y-4">
+                <Skeleton className="h-64 w-full rounded-lg" />
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-4 w-1/2" />
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Items Grid */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filteredAndSortedItems.map((item) => (
-            <Card key={item.id} className="overflow-hidden hover:shadow-lg transition-shadow">
-              <CardHeader className="p-0">
-                <div className="relative aspect-video bg-muted">
-                  <Image src={item.imageUrl || "/placeholder.svg"} alt={item.name} fill className="object-cover" />
-                  {!item.available && (
-                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                      <Badge variant="destructive" className="text-base">
-                        Unavailable
-                      </Badge>
-                    </div>
-                  )}
-                </div>
-              </CardHeader>
-              <CardContent className="p-4">
-                <div className="mb-2">
-                  <Badge variant="secondary" className="text-xs">
-                    {item.category}
-                  </Badge>
-                </div>
-                <h3 className="font-semibold text-lg mb-2 line-clamp-1">{item.name}</h3>
-                <p className="text-muted-foreground text-sm mb-3 line-clamp-2">{item.description}</p>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-2xl font-bold text-[#2B70FF]">${item.price}</span>
-                  <span className="text-sm text-muted-foreground">/day</span>
-                </div>
-                {item.rating && (
-                  <div className="flex items-center gap-1">
-                    <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                    <span className="text-sm font-medium">{item.rating}</span>
-                  </div>
-                )}
-              </CardContent>
-              <CardFooter className="p-4 pt-0">
-                <Button asChild className="w-full bg-[#2B70FF] hover:bg-[#1A4FCC]" disabled={!item.available}>
-                  <Link href={`/items/${item.id}`}>View Details</Link>
-                </Button>
-              </CardFooter>
-            </Card>
-          ))}
-        </div>
+        {!loading && filteredAndSortedItems.length > 0 && (
+          <>
+            <div className="mb-4">
+              <p className="text-muted-foreground">
+                {filteredAndSortedItems.length} {filteredAndSortedItems.length === 1 ? 'item' : 'items'} found
+              </p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {filteredAndSortedItems.map((item) => (
+                <Link key={item.id} href={`/items/${item.id}`}>
+                  <Card className="h-full hover:shadow-lg transition-shadow cursor-pointer">
+                    <CardHeader className="p-0">
+                      <div className="relative h-64">
+                        <Image
+                          src={item.imageUrl || "/placeholder.svg"}
+                          alt={item.name}
+                          fill
+                          className="object-cover rounded-t-lg"
+                        />
+                        {!item.available && (
+                          <Badge className="absolute top-2 right-2 bg-destructive">Unavailable</Badge>
+                        )}
+                      </div>
+                    </CardHeader>
+                    <CardContent className="pt-4">
+                      <h3 className="font-semibold text-lg mb-2 line-clamp-1">{item.name}</h3>
+                      <p className="text-sm text-muted-foreground mb-2 line-clamp-2">{item.description}</p>
+                      <div className="flex items-center justify-between">
+                        <Badge variant="outline">{item.category}</Badge>
+                        {item.rating && (
+                          <div className="flex items-center gap-1">
+                            <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                            <span className="text-sm font-medium">{item.rating}</span>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                    <CardFooter>
+                      <div className="flex items-center justify-between w-full">
+                        <span className="text-2xl font-bold">${item.price}</span>
+                        <span className="text-sm text-muted-foreground">/day</span>
+                      </div>
+                    </CardFooter>
+                  </Card>
+                </Link>
+              ))}
+            </div>
+          </>
+        )}
 
-        {filteredAndSortedItems.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-muted-foreground text-lg">No items found matching your criteria</p>
+        {/* Empty State */}
+        {!loading && filteredAndSortedItems.length === 0 && (
+          <div className="text-center py-16">
+            <p className="text-muted-foreground text-lg">
+              {searchQuery ? "No items found matching your search." : "No items available."}
+            </p>
+            {searchQuery && (
+              <Button 
+                variant="outline" 
+                onClick={() => { 
+                  setSearchQuery("")
+                  loadItems()
+                }} 
+                className="mt-4"
+              >
+                Clear Search
+              </Button>
+            )}
+          </div>
+        )}
+
+        {/* Pagination */}
+        {!loading && totalPages > 1 && (
+          <div className="flex justify-center items-center gap-4 mt-12">
             <Button
               variant="outline"
-              className="mt-4 bg-transparent"
-              onClick={() => {
-                setSearchQuery("")
-                setSelectedCategory("all")
-                setSelectedSubcategory("all")
-                setPriceRange("all")
-                setSortBy("name")
-              }}
+              onClick={() => setPage(Math.max(0, page - 1))}
+              disabled={page === 0}
             >
-              Clear Filters
+              Previous
+            </Button>
+            <span className="text-sm text-muted-foreground">
+              Page {page + 1} of {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              onClick={() => setPage(Math.min(totalPages - 1, page + 1))}
+              disabled={page >= totalPages - 1}
+            >
+              Next
             </Button>
           </div>
         )}

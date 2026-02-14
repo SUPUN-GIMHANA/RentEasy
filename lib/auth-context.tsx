@@ -3,64 +3,107 @@
 import type React from "react"
 
 import { createContext, useContext, useState, useEffect } from "react"
+import { api, getStoredUser } from "./api-client"
 
 interface User {
   id: string
   email: string
-  name: string
+  firstName: string
+  lastName: string
+  role: string
+  phoneNumber?: string
+  address?: string
+  city?: string
+  country?: string
+  profileImageUrl?: string
 }
 
 interface AuthContextType {
   user: User | null
   login: (email: string, password: string) => Promise<boolean>
-  signup: (name: string, email: string, password: string) => Promise<boolean>
+  signup: (data: any) => Promise<boolean>
   logout: () => void
   isAuthenticated: boolean
+  isLoading: boolean
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("user")
-    if (storedUser) {
-      setUser(JSON.parse(storedUser))
+    const loadUser = async () => {
+      try {
+        const storedUser = getStoredUser()
+        if (storedUser) {
+          // Verify token is still valid
+          const userData = await api.users.getProfile()
+          setUser(userData)
+        }
+      } catch (error) {
+        console.error("Failed to load user:", error)
+        api.auth.logout()
+      } finally {
+        setIsLoading(false)
+      }
     }
+    loadUser()
   }, [])
 
   const login = async (email: string, password: string) => {
-    // Mock login - in production, this would call an API
-    const mockUser = {
-      id: "1",
-      email,
-      name: email.split("@")[0],
+    try {
+      const response = await api.auth.login({ email, password })
+      // Fetch full user profile after login
+      const userData = await api.users.getProfile()
+      setUser({
+        id: userData.id,
+        email: userData.email,
+        firstName: userData.firstName,
+        lastName: userData.lastName,
+        role: userData.role,
+        phoneNumber: userData.phoneNumber,
+        address: userData.address,
+        city: userData.city,
+        country: userData.country,
+        profileImageUrl: userData.profileImageUrl,
+      })
+      return true
+    } catch (error) {
+      console.error("Login failed:", error)
+      return false
     }
-    setUser(mockUser)
-    localStorage.setItem("user", JSON.stringify(mockUser))
-    return true
   }
 
-  const signup = async (name: string, email: string, password: string) => {
-    // Mock signup - in production, this would call an API
-    const mockUser = {
-      id: "1",
-      email,
-      name,
+  const signup = async (data: any) => {
+    try {
+      await api.auth.signup(data)
+      // Auto login after signup
+      const success = await login(data.email, data.password)
+      return success
+    } catch (error) {
+      console.error("Signup failed:", error)
+      return false
     }
-    setUser(mockUser)
-    localStorage.setItem("user", JSON.stringify(mockUser))
-    return true
   }
 
   const logout = () => {
+    api.auth.logout()
     setUser(null)
-    localStorage.removeItem("user")
   }
 
   return (
-    <AuthContext.Provider value={{ user, login, signup, logout, isAuthenticated: !!user }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        login,
+        signup,
+        logout,
+        isAuthenticated: !!user,
+        isLoading,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   )
