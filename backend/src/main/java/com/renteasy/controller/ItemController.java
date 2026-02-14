@@ -229,6 +229,8 @@ public class ItemController {
         dto.setImageUrl(item.getImageUrl());
         dto.setAdditionalImages(item.getAdditionalImages());
         dto.setAvailable(item.getAvailable());
+        dto.setAvailableDates(item.getAvailableDates() == null ? null
+            : item.getAvailableDates().stream().map(java.time.LocalDate::toString).collect(Collectors.toList()));
         dto.setLocation(item.getLocation());
         dto.setMinimumRentalPeriod(item.getMinimumRentalPeriod());
         dto.setMaximumRentalPeriod(item.getMaximumRentalPeriod());

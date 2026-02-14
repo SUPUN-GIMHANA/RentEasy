@@ -1,30 +1,77 @@
 "use client"
 
-import { useState } from "react"
+import { use, useEffect, useState } from "react"
 import { Header } from "@/components/header"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Calendar } from "@/components/ui/calendar"
-import { mockItems } from "@/lib/mock-data"
+import { api } from "@/lib/api-client"
+import type { Item } from "@/lib/types"
 import { useAuth } from "@/lib/auth-context"
 import { ArrowLeft, CalendarIcon, CheckCircle2, Package } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 
-export default function ItemDetailPage({ params }: { params: { id: string } }) {
-  const item = mockItems.find((i) => i.id === params.id)
+export default function ItemDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params)
+  const [item, setItem] = useState<Item | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined)
   const { isAuthenticated } = useAuth()
   const router = useRouter()
+
+  useEffect(() => {
+    let isMounted = true
+
+    const loadItem = async () => {
+      try {
+        setLoading(true)
+        setError("")
+        const data = await api.items.getById(id)
+        if (isMounted) {
+          setItem(data)
+        }
+      } catch (err) {
+        if (isMounted) {
+          setError(err instanceof Error ? err.message : "Failed to load item")
+          setItem(null)
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false)
+        }
+      }
+    }
+
+    loadItem()
+    return () => {
+      isMounted = false
+    }
+  }, [id])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <div className="container mx-auto px-4 py-16 text-center">
+          <h1 className="text-2xl font-bold mb-4">Loading item...</h1>
+        </div>
+      </div>
+    )
+  }
 
   if (!item) {
     return (
       <div className="min-h-screen bg-background">
         <Header />
         <div className="container mx-auto px-4 py-16 text-center">
-          <h1 className="text-2xl font-bold mb-4">Item Not Found</h1>
+          <h1 className="text-2xl font-bold mb-4">
+            {error ? "Unable to load item" : "Item Not Found"}
+          </h1>
+          {error && <p className="text-muted-foreground mb-6">{error}</p>}
           <Button asChild>
             <Link href="/browse">Back to Browse</Link>
           </Button>
@@ -32,8 +79,6 @@ export default function ItemDetailPage({ params }: { params: { id: string } }) {
       </div>
     )
   }
-
-  const availableDates = item.availableDates.map((dateStr) => new Date(dateStr))
 
   const handleBooking = () => {
     if (!isAuthenticated) {
@@ -119,12 +164,13 @@ export default function ItemDetailPage({ params }: { params: { id: string } }) {
                     onSelect={setSelectedDate}
                     disabled={(date) => {
                       const dateStr = date.toISOString().split("T")[0]
-                      return !item.availableDates.includes(dateStr)
+                      const availableDates = item.availableDates || []
+                      return !availableDates.includes(dateStr)
                     }}
                     className="rounded-md border"
                   />
                   <p className="text-sm text-muted-foreground mt-4">
-                    {item.availableDates.length} dates available for booking
+                    {(item.availableDates?.length ?? 0)} dates available for booking
                   </p>
                 </CardContent>
               </Card>

@@ -22,6 +22,7 @@ public class ItemDTO {
     private String imageUrl;
     private List<String> additionalImages;
     private Boolean available;
+    private List<String> availableDates;
     private String location;
     private Integer minimumRentalPeriod;
     private Integer maximumRentalPeriod;
