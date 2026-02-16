@@ -131,10 +131,12 @@ export const api = {
       return handleResponse(response);
     },
     
-    getByCategory: async (category: string, page = 0, size = 12) => {
-      const response = await fetch(
-        `${API_BASE_URL}/items/category/${category}?page=${page}&size=${size}`
-      );
+    getByCategory: async (category: string, page = 0, size = 12, subcategory?: string) => {
+      let url = `${API_BASE_URL}/items/category/${category}?page=${page}&size=${size}`;
+      if (subcategory) {
+        url += `&subcategory=${encodeURIComponent(subcategory)}`;
+      }
+      const response = await fetch(url);
       return handleResponse(response);
     },
     
@@ -164,6 +166,9 @@ export const api = {
       // Add text fields
       formData.append('name', data.name);
       formData.append('category', data.category);
+      if (data.subcategory) {
+        formData.append('subcategory', data.subcategory);
+      }
       formData.append('price', data.price.toString());
       formData.append('location', data.location);
       formData.append('description', data.description);

@@ -18,6 +18,7 @@ public class ItemDTO {
     private String name;
     private String description;
     private String category;
+    private String subcategory;
     private BigDecimal price;
     private String imageUrl;
     private List<String> additionalImages;

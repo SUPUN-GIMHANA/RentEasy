@@ -15,11 +15,23 @@ import Link from "next/link"
 
 const categories = ["vehicles", "properties", "electronics", "clothing", "tools", "sports", "camping", "events"]
 
+const subcategories: Record<string, string[]> = {
+  vehicles: ["Cars", "Motorbikes", "Bicycles", "Trucks/Lorries"],
+  properties: ["Apartments/Houses", "Office space/co-works", "Event Halls/Conference rooms", "Storage units"],
+  electronics: ["Cameras", "Laptops/monitors/projectors", "Gaming consoles", "Party items"],
+  clothing: ["Wedding dresses/suits", "Party costumes", "Theater Costumes"],
+  tools: ["Power tools", "Construction equipment"],
+  sports: ["Indoor courts", "Outdoor courts", "Swimming pools", "Badminton courts", "Grounds"],
+  camping: ["Camping items", "Tour Guiders"],
+  events: ["Electric items", "Event items"],
+}
+
 interface Item {
   id: string
   name: string
   description: string
   category: string
+  subcategory?: string
   price: number
   imageUrl: string
   available: boolean
@@ -34,12 +46,18 @@ export default function BrowsePage() {
   const [totalPages, setTotalPages] = useState(0)
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("all")
-  const [priceRange, setPriceRange] = useState("all")
+  const [selectedSubcategory, setSelectedSubcategory] = useState("all")
   const [sortBy, setSortBy] = useState("name")
 
   useEffect(() => {
     loadItems()
-  }, [page, selectedCategory])
+  }, [page, selectedCategory, selectedSubcategory])
+
+  useEffect(() => {
+    // Reset subcategory and page when category changes
+    setSelectedSubcategory("all")
+    setPage(0)
+  }, [selectedCategory])
 
   const loadItems = async () => {
     try {
@@ -47,12 +65,19 @@ export default function BrowsePage() {
       setError("")
       
       let response
+      console.log("Loading items:", { selectedCategory, selectedSubcategory, page })
+      
       if (selectedCategory === "all") {
         response = await api.items.getAll(page, 12)
-      } else {
+      } else if (selectedSubcategory === "all") {
+        console.log("Fetching by category only:", selectedCategory)
         response = await api.items.getByCategory(selectedCategory, page, 12)
+      } else {
+        console.log("Fetching by category and subcategory:", selectedCategory, selectedSubcategory)
+        response = await api.items.getByCategory(selectedCategory, page, 12, selectedSubcategory)
       }
       
+      console.log("API Response:", response)
       setItems(response.content || [])
       setTotalPages(response.totalPages || 0)
     } catch (error: any) {
@@ -88,15 +113,10 @@ export default function BrowsePage() {
   const filteredAndSortedItems = useMemo(() => {
     let filtered = [...items]
 
-    // Apply price filter
-    filtered = filtered.filter((item) => {
-      let matchesPrice = true
-      if (priceRange === "0-50") matchesPrice = item.price <= 50
-      else if (priceRange === "51-100") matchesPrice = item.price > 50 && item.price <= 100
-      else if (priceRange === "101-200") matchesPrice = item.price > 100 && item.price <= 200
-      else if (priceRange === "201+") matchesPrice = item.price > 200
-      return matchesPrice
-    })
+    // Apply subcategory filter
+    if (selectedSubcategory !== "all") {
+      filtered = filtered.filter((item) => item.subcategory === selectedSubcategory)
+    }
 
     // Apply sorting
     filtered.sort((a, b) => {
@@ -109,7 +129,9 @@ export default function BrowsePage() {
     })
 
     return filtered
-  }, [items, priceRange, sortBy])
+  }, [items, selectedSubcategory, sortBy])
+
+  const availableSubcategories = selectedCategory !== "all" ? subcategories[selectedCategory] || [] : []
 
   return (
     <div className="min-h-screen bg-background">
@@ -148,7 +170,7 @@ export default function BrowsePage() {
             </div>
           )}
 
-          <div className="flex flex-wrap gap-4">
+          <div className="flex flex-wrap gap-4" suppressHydrationWarning>
             <Select value={selectedCategory} onValueChange={setSelectedCategory}>
               <SelectTrigger className="w-full md:w-[180px]">
                 <SelectValue placeholder="Category" />
@@ -163,18 +185,21 @@ export default function BrowsePage() {
               </SelectContent>
             </Select>
 
-            <Select value={priceRange} onValueChange={setPriceRange}>
-              <SelectTrigger className="w-full md:w-[180px]">
-                <SelectValue placeholder="Price Range" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Prices</SelectItem>
-                <SelectItem value="0-50">$0 - $50</SelectItem>
-                <SelectItem value="51-100">$51 - $100</SelectItem>
-                <SelectItem value="101-200">$101 - $200</SelectItem>
-                <SelectItem value="201+">$201+</SelectItem>
-              </SelectContent>
-            </Select>
+            {availableSubcategories.length > 0 && (
+              <Select value={selectedSubcategory} onValueChange={setSelectedSubcategory}>
+                <SelectTrigger className="w-full md:w-[200px]">
+                  <SelectValue placeholder="Subcategory" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Subcategories</SelectItem>
+                  {availableSubcategories.map((subcat) => (
+                    <SelectItem key={subcat} value={subcat}>
+                      {subcat}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
 
             <Select value={sortBy} onValueChange={setSortBy}>
               <SelectTrigger className="w-full md:w-[180px]">
@@ -194,7 +219,7 @@ export default function BrowsePage() {
               onClick={() => {
                 setSearchQuery("")
                 setSelectedCategory("all")
-                setPriceRange("all")
+                setSelectedSubcategory("all")
                 setSortBy("name")
                 loadItems()
               }}
@@ -245,8 +270,13 @@ export default function BrowsePage() {
                     <CardContent className="pt-4">
                       <h3 className="font-semibold text-lg mb-2 line-clamp-1">{item.name}</h3>
                       <p className="text-sm text-muted-foreground mb-2 line-clamp-2">{item.description}</p>
-                      <div className="flex items-center justify-between">
-                        <Badge variant="outline">{item.category}</Badge>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex gap-1 flex-wrap">
+                          <Badge variant="outline">{item.category}</Badge>
+                          {item.subcategory && (
+                            <Badge variant="secondary" className="text-xs">{item.subcategory}</Badge>
+                          )}
+                        </div>
                         {item.rating && (
                           <div className="flex items-center gap-1">
                             <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />

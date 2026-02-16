@@ -15,9 +15,16 @@ public interface ItemRepository extends JpaRepository<Item, String> {
     
     Page<Item> findByAvailableTrue(Pageable pageable);
     
-    Page<Item> findByCategory(String category, Pageable pageable);
+    @Query("SELECT i FROM Item i WHERE i.available = true AND LOWER(i.category) = LOWER(:category)")
+    Page<Item> findByCategoryAndAvailableTrue(@Param("category") String category, Pageable pageable);
     
-    Page<Item> findByCategoryAndAvailableTrue(String category, Pageable pageable);
+    @Query("SELECT i FROM Item i WHERE i.available = true AND " +
+           "LOWER(i.category) = LOWER(:category) AND " +
+           "i.subcategory IS NOT NULL AND " +
+           "LOWER(TRIM(i.subcategory)) = LOWER(TRIM(:subcategory))")
+    Page<Item> findByCategoryAndSubcategoryAndAvailableTrue(@Param("category") String category, 
+                                                            @Param("subcategory") String subcategory, 
+                                                            Pageable pageable);
     
     List<Item> findByOwnerId(String ownerId);
     

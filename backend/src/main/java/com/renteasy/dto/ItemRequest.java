@@ -21,6 +21,8 @@ public class ItemRequest {
     @NotBlank(message = "Category is required")
     private String category;
     
+    private String subcategory;
+    
     @NotNull(message = "Price is required")
     @Positive(message = "Price must be positive")
     private BigDecimal price;

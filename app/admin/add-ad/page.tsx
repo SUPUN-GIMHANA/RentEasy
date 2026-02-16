@@ -13,11 +13,23 @@ import { useRouter } from "next/navigation"
 import { api } from "@/lib/api-client"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
+const SUBCATEGORIES: Record<string, string[]> = {
+  vehicles: ["Cars", "Motorbikes", "Bicycles", "Trucks/Lorries"],
+  properties: ["Apartments/Houses", "Office space/co-works", "Event Halls/Conference rooms", "Storage units"],
+  electronics: ["Cameras", "Laptops/monitors/projectors", "Gaming consoles", "Party items"],
+  clothing: ["Wedding dresses/suits", "Party costumes", "Theater Costumes"],
+  tools: ["Power tools", "Construction equipment"],
+  sports: ["Indoor courts", "Outdoor courts", "Swimming pools", "Badminton courts", "Grounds"],
+  camping: ["Camping items", "Tour Guiders"],
+  events: ["Electric items", "Event items"],
+}
+
 export default function AddAdvertisementPage() {
   const router = useRouter()
   const [formData, setFormData] = useState({
     name: "",
     category: "",
+    subcategory: "",
     price: "",
     location: "",
     description: "",
@@ -36,10 +48,18 @@ export default function AddAdvertisementPage() {
     }))
   }
 
-  const handleSelectChange = (value: string) => {
+  const handleCategoryChange = (value: string) => {
     setFormData((prev) => ({
       ...prev,
       category: value,
+      subcategory: "", // Reset subcategory when category changes
+    }))
+  }
+
+  const handleSubcategoryChange = (value: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      subcategory: value,
     }))
   }
 
@@ -82,6 +102,7 @@ export default function AddAdvertisementPage() {
       
       if (!formData.name?.trim()) missingFields.push("Item Name")
       if (!formData.category?.trim()) missingFields.push("Category")
+      if (!formData.subcategory?.trim()) missingFields.push("Subcategory")
       if (!formData.price?.trim()) missingFields.push("Price")
       if (!formData.location?.trim()) missingFields.push("Location")
       if (!formData.description?.trim()) missingFields.push("Description")
@@ -102,6 +123,7 @@ export default function AddAdvertisementPage() {
       const itemData = {
         name: formData.name,
         category: formData.category,
+        subcategory: formData.subcategory,
         price: parseFloat(formData.price),
         location: formData.location,
         description: formData.description,
@@ -122,8 +144,10 @@ export default function AddAdvertisementPage() {
     }
   }
 
+  const availableSubcategories = formData.category ? SUBCATEGORIES[formData.category] || [] : []
+
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-6 max-w-4xl" suppressHydrationWarning>
       <div>
         <h1 className="text-3xl font-bold mb-2">Add Advertisement</h1>
         <p className="text-muted-foreground">Create a new rental listing with images and details</p>
@@ -141,7 +165,7 @@ export default function AddAdvertisementPage() {
             <CardTitle>Item Details</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-2" suppressHydrationWarning>
               <div className="space-y-2">
                 <Label htmlFor="item-name">Item Name *</Label>
                 <Input
@@ -155,7 +179,7 @@ export default function AddAdvertisementPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="category">Category *</Label>
-                <Select value={formData.category} onValueChange={handleSelectChange}>
+                <Select value={formData.category} onValueChange={handleCategoryChange}>
                   <SelectTrigger id="category">
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
@@ -168,6 +192,25 @@ export default function AddAdvertisementPage() {
                     <SelectItem value="sports">Sports</SelectItem>
                     <SelectItem value="camping">Camping</SelectItem>
                     <SelectItem value="events">Events</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="subcategory">Subcategory *</Label>
+                <Select 
+                  value={formData.subcategory} 
+                  onValueChange={handleSubcategoryChange}
+                  disabled={!formData.category}
+                >
+                  <SelectTrigger id="subcategory">
+                    <SelectValue placeholder={formData.category ? "Select subcategory" : "Select category first"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableSubcategories.map((subcat) => (
+                      <SelectItem key={subcat} value={subcat}>
+                        {subcat}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

@@ -13,6 +13,17 @@ import { Upload, X } from "lucide-react"
 import Image from "next/image"
 import { useRouter, useParams } from "next/navigation"
 
+const SUBCATEGORIES: Record<string, string[]> = {
+  vehicles: ["Cars", "Motorbikes", "Bicycles", "Trucks/Lorries"],
+  properties: ["Apartments/Houses", "Office space/co-works", "Event Halls/Conference rooms", "Storage units"],
+  electronics: ["Cameras", "Laptops/monitors/projectors", "Gaming consoles", "Party items"],
+  clothing: ["Wedding dresses/suits", "Party costumes", "Theater Costumes"],
+  tools: ["Power tools", "Construction equipment"],
+  sports: ["Indoor courts", "Outdoor courts", "Swimming pools", "Badminton courts", "Grounds"],
+  camping: ["Camping items", "Tour Guiders"],
+  events: ["Electric items", "Event items"],
+}
+
 export default function EditItemPage() {
   const router = useRouter()
   const params = useParams()
@@ -21,6 +32,7 @@ export default function EditItemPage() {
   const [formData, setFormData] = useState({
     name: "",
     category: "",
+    subcategory: "",
     price: "",
     location: "",
     description: "",
@@ -39,6 +51,7 @@ export default function EditItemPage() {
         setFormData({
           name: item.name,
           category: item.category,
+          subcategory: item.subcategory || "",
           price: item.price.toString(),
           location: item.location || "",
           description: item.description || "",
@@ -59,10 +72,18 @@ export default function EditItemPage() {
     }))
   }
 
-  const handleSelectChange = (value: string) => {
+  const handleCategoryChange = (value: string) => {
     setFormData((prev) => ({
       ...prev,
       category: value,
+      subcategory: "", // Reset subcategory when category changes
+    }))
+  }
+
+  const handleSubcategoryChange = (value: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      subcategory: value,
     }))
   }
 
@@ -92,6 +113,7 @@ export default function EditItemPage() {
       id: itemId,
       name: formData.name,
       category: formData.category,
+      subcategory: formData.subcategory,
       price: parseInt(formData.price),
       location: formData.location,
       description: formData.description,
@@ -112,12 +134,14 @@ export default function EditItemPage() {
     router.push("/admin/items")
   }
 
+  const availableSubcategories = formData.category ? SUBCATEGORIES[formData.category] || [] : []
+
   if (loading) {
     return <div className="flex items-center justify-center py-12">Loading...</div>
   }
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-6 max-w-4xl" suppressHydrationWarning>
       <div>
         <h1 className="text-3xl font-bold mb-2">Edit Item</h1>
         <p className="text-muted-foreground">Update rental item details and images</p>
@@ -128,8 +152,8 @@ export default function EditItemPage() {
           <CardHeader>
             <CardTitle>Item Details</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
+          <CardContent className="space-y-4" suppressHydrationWarning>
+            <div className="grid gap-4 sm:grid-cols-2" suppressHydrationWarning>
               <div className="space-y-2">
                 <Label htmlFor="item-name">Item Name *</Label>
                 <Input
@@ -143,7 +167,7 @@ export default function EditItemPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="category">Category *</Label>
-                <Select value={formData.category} onValueChange={handleSelectChange}>
+                <Select value={formData.category} onValueChange={handleCategoryChange}>
                   <SelectTrigger id="category">
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
@@ -156,6 +180,25 @@ export default function EditItemPage() {
                     <SelectItem value="sports">Sports</SelectItem>
                     <SelectItem value="camping">Camping</SelectItem>
                     <SelectItem value="events">Events</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="subcategory">Subcategory *</Label>
+                <Select 
+                  value={formData.subcategory} 
+                  onValueChange={handleSubcategoryChange}
+                  disabled={!formData.category}
+                >
+                  <SelectTrigger id="subcategory">
+                    <SelectValue placeholder={formData.category ? "Select subcategory" : "Select category first"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableSubcategories.map((subcat) => (
+                      <SelectItem key={subcat} value={subcat}>
+                        {subcat}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

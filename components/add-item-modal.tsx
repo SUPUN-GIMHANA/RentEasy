@@ -34,6 +34,17 @@ const CATEGORIES = [
   "Events",
 ]
 
+const SUBCATEGORIES: Record<string, string[]> = {
+  Vehicles: ["Cars", "Motorbikes", "Bicycles", "Trucks/Lorries"],
+  Properties: ["Apartments/Houses", "Office space/co-works", "Event Halls/Conference rooms", "Storage units"],
+  Electronics: ["Cameras", "Laptops/monitors/projectors", "Gaming consoles", "Party items"],
+  Clothing: ["Wedding dresses/suits", "Party costumes", "Theater Costumes"],
+  Tools: ["Power tools", "Construction equipment"],
+  Sports: ["Indoor courts", "Outdoor courts", "Swimming pools", "Badminton courts", "Grounds"],
+  Camping: ["Camping items", "Tour Guiders"],
+  Events: ["Electric items", "Event items"],
+}
+
 interface AddItemModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -44,8 +55,14 @@ export function AddItemModal({ open, onOpenChange, onAddItem }: AddItemModalProp
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
   const [category, setCategory] = useState("")
+  const [subcategory, setSubcategory] = useState("")
   const [price, setPrice] = useState("")
   const [image, setImage] = useState("/placeholder.svg")
+
+  const handleCategoryChange = (value: string) => {
+    setCategory(value)
+    setSubcategory("") // Reset subcategory when category changes
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -60,6 +77,7 @@ export function AddItemModal({ open, onOpenChange, onAddItem }: AddItemModalProp
       name,
       description,
       category,
+      subcategory,
       price: parseFloat(price),
       image,
       status: "active",
@@ -71,10 +89,13 @@ export function AddItemModal({ open, onOpenChange, onAddItem }: AddItemModalProp
     setName("")
     setDescription("")
     setCategory("")
+    setSubcategory("")
     setPrice("")
     setImage("/placeholder.svg")
     onOpenChange(false)
   }
+
+  const availableSubcategories = category ? SUBCATEGORIES[category] || [] : []
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -108,7 +129,7 @@ export function AddItemModal({ open, onOpenChange, onAddItem }: AddItemModalProp
 
           <div className="space-y-2">
             <Label htmlFor="category">Category</Label>
-            <Select value={category} onValueChange={setCategory}>
+            <Select value={category} onValueChange={handleCategoryChange}>
               <SelectTrigger>
                 <SelectValue placeholder="Select a category" />
               </SelectTrigger>
@@ -121,6 +142,24 @@ export function AddItemModal({ open, onOpenChange, onAddItem }: AddItemModalProp
               </SelectContent>
             </Select>
           </div>
+
+          {availableSubcategories.length > 0 && (
+            <div className="space-y-2">
+              <Label htmlFor="subcategory">Subcategory</Label>
+              <Select value={subcategory} onValueChange={setSubcategory}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a subcategory" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableSubcategories.map((subcat) => (
+                    <SelectItem key={subcat} value={subcat}>
+                      {subcat}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="price">Daily Rental Price (LKR)</Label>

@@ -29,7 +29,8 @@ public class ItemService {
         Item item = new Item();
         item.setName(request.getName());
         item.setDescription(request.getDescription());
-        item.setCategory(request.getCategory());
+        item.setCategory(request.getCategory() != null ? request.getCategory().trim() : null);
+        item.setSubcategory(request.getSubcategory() != null ? request.getSubcategory().trim() : null);
         item.setPrice(request.getPrice());
         item.setImageUrl(request.getImageUrl());
         item.setAdditionalImages(request.getAdditionalImages());
@@ -78,7 +79,8 @@ public class ItemService {
         
         item.setName(request.getName());
         item.setDescription(request.getDescription());
-        item.setCategory(request.getCategory());
+        item.setCategory(request.getCategory() != null ? request.getCategory().trim() : null);
+        item.setSubcategory(request.getSubcategory() != null ? request.getSubcategory().trim() : null);
         item.setPrice(request.getPrice());
         item.setImageUrl(request.getImageUrl());
         item.setAdditionalImages(request.getAdditionalImages());
@@ -113,7 +115,19 @@ public class ItemService {
     @Transactional(readOnly = true)
     public Page<Item> getItemsByCategory(String category, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        return itemRepository.findByCategoryAndAvailableTrue(category, pageable);
+        String trimmedCategory = category != null ? category.trim() : category;
+        return itemRepository.findByCategoryAndAvailableTrue(trimmedCategory, pageable);
+    }
+    
+    @Transactional(readOnly = true)
+    public Page<Item> getItemsByCategoryAndSubcategory(String category, String subcategory, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        String trimmedCategory = category != null ? category.trim() : category;
+        String trimmedSubcategory = subcategory != null ? subcategory.trim() : subcategory;
+        System.out.println("Filtering items by category: '" + trimmedCategory + "' and subcategory: '" + trimmedSubcategory + "'");
+        Page<Item> results = itemRepository.findByCategoryAndSubcategoryAndAvailableTrue(trimmedCategory, trimmedSubcategory, pageable);
+        System.out.println("Found " + results.getTotalElements() + " items");
+        return results;
     }
     
     @Transactional(readOnly = true)

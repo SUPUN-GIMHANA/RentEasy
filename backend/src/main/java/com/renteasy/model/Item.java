@@ -37,6 +37,8 @@ public class Item {
     @Column(nullable = false)
     private String category;
     
+    private String subcategory;
+    
     @Column(nullable = false)
     private BigDecimal price;
     

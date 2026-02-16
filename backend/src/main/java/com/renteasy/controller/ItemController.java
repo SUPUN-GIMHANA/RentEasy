@@ -32,6 +32,7 @@ public class ItemController {
     public ResponseEntity<?> createItemWithImages(
             @RequestParam("name") String name,
             @RequestParam("category") String category,
+            @RequestParam(value = "subcategory", required = false) String subcategory,
             @RequestParam("price") String price,
             @RequestParam("location") String location,
             @RequestParam("description") String description,
@@ -45,7 +46,10 @@ public class ItemController {
             // Create ItemRequest from multipart data
             ItemRequest request = new ItemRequest();
             request.setName(name);
-            request.setCategory(category);
+            request.setCategory(category != null ? category.trim() : null);
+            if (subcategory != null && !subcategory.trim().isEmpty()) {
+                request.setSubcategory(subcategory.trim());
+            }
             request.setPrice(new java.math.BigDecimal(price));
             request.setLocation(location);
             request.setDescription(description);
@@ -153,8 +157,19 @@ public class ItemController {
     public ResponseEntity<Page<ItemDTO>> getItemsByCategory(
             @PathVariable String category,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "12") int size) {
-        Page<Item> items = itemService.getItemsByCategory(category, page, size);
+            @RequestParam(defaultValue = "12") int size,
+            @RequestParam(required = false) String subcategory) {
+        System.out.println("ItemController.getItemsByCategory called with category='" + category + "', subcategory='" + subcategory + "', page=" + page);
+        Page<Item> items;
+        String trimmedCategory = category.trim();
+        if (subcategory != null && !subcategory.trim().isEmpty()) {
+            String trimmedSubcategory = subcategory.trim();
+            System.out.println("Filtering by category AND subcategory: '" + trimmedSubcategory + "'");
+            items = itemService.getItemsByCategoryAndSubcategory(trimmedCategory, trimmedSubcategory, page, size);
+        } else {
+            System.out.println("Filtering by category only");
+            items = itemService.getItemsByCategory(trimmedCategory, page, size);
+        }
         return ResponseEntity.ok(items.map(this::convertToDTO));
     }
     
@@ -225,6 +240,7 @@ public class ItemController {
         dto.setName(item.getName());
         dto.setDescription(item.getDescription());
         dto.setCategory(item.getCategory());
+        dto.setSubcategory(item.getSubcategory());
         dto.setPrice(item.getPrice());
         dto.setImageUrl(item.getImageUrl());
         dto.setAdditionalImages(item.getAdditionalImages());
