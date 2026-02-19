@@ -61,6 +61,9 @@ public class Item {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "owner_id", nullable = false)
     private User owner;
+
+    @Column(name = "owner_phone_number")
+    private String ownerPhoneNumber;
     
     private String location;
     private Integer minimumRentalPeriod = 1; // days

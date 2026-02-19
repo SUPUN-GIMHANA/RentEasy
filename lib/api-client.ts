@@ -1,5 +1,15 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081/api';
 
+export class ApiError extends Error {
+  status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+  }
+}
+
 // Helper function to get auth token
 const getAuthToken = () => {
   if (typeof window !== 'undefined') {
@@ -34,7 +44,7 @@ const handleResponse = async (response: Response) => {
       }
     }
 
-    throw new Error(message);
+    throw new ApiError(response.status, message);
   }
   
   const contentType = response.headers.get('content-type');
@@ -68,8 +78,11 @@ export const api = {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(data),
         });
-        return handleResponse(response);
+        return await handleResponse(response);
       } catch (error) {
+        if (error instanceof ApiError) {
+          throw error;
+        }
         console.error('Signup error:', error);
         throw new Error('Unable to connect to server. Please ensure the backend is running.');
       }
@@ -97,6 +110,9 @@ export const api = {
         }
         return result;
       } catch (error) {
+        if (error instanceof ApiError) {
+          throw error;
+        }
         console.error('Login error:', error);
         throw new Error('Unable to connect to server. Please ensure the backend is running.');
       }
@@ -161,6 +177,7 @@ export const api = {
     },
     
     create: async (data: any) => {
+      const token = getAuthToken();
       const formData = new FormData();
       
       // Add text fields
@@ -173,12 +190,20 @@ export const api = {
       formData.append('location', data.location);
       formData.append('description', data.description);
       formData.append('available', data.available?.toString() || 'true');
+      if (data.ownerPhoneNumber) {
+        formData.append('ownerPhoneNumber', data.ownerPhoneNumber);
+      }
       
       if (data.minimumRentalPeriod) {
         formData.append('minimumRentalPeriod', data.minimumRentalPeriod.toString());
       }
       if (data.maximumRentalPeriod) {
         formData.append('maximumRentalPeriod', data.maximumRentalPeriod.toString());
+      }
+      if (Array.isArray(data.availableDates)) {
+        data.availableDates.forEach((date: string) => {
+          formData.append('availableDates', date);
+        });
       }
       
       // Add image files
@@ -194,6 +219,9 @@ export const api = {
       
       const response = await fetch(`${API_BASE_URL}/items`, {
         method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
         body: formData,
       });
       return handleResponse(response);
@@ -209,6 +237,68 @@ export const api = {
         },
         body: JSON.stringify(data),
       });
+      return handleResponse(response);
+    },
+
+    updateBookingDates: async (id: string, availableDates: string[], fallbackItemData?: any) => {
+      const token = getAuthToken();
+
+      const response = await fetch(`${API_BASE_URL}/items/${id}/booking-dates`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(availableDates || []),
+      });
+
+      if (response.ok) {
+        const contentType = response.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          return handleResponse(response);
+        }
+        return { success: true };
+      }
+
+      // Fallback for backend builds that don't expose /booking-dates endpoint
+      // or return non-standard error codes/messages for missing route.
+      if (fallbackItemData) {
+        const fallbackPayload = {
+          name: fallbackItemData.name,
+          description: fallbackItemData.description,
+          category: fallbackItemData.category,
+          subcategory: fallbackItemData.subcategory,
+          price: fallbackItemData.price,
+          imageUrl: fallbackItemData.imageUrl,
+          additionalImages: fallbackItemData.additionalImages || [],
+          available: fallbackItemData.available ?? true,
+          availableDates: availableDates || [],
+          location: fallbackItemData.location,
+          ownerPhoneNumber: fallbackItemData.ownerPhoneNumber,
+          minimumRentalPeriod: fallbackItemData.minimumRentalPeriod,
+          maximumRentalPeriod: fallbackItemData.maximumRentalPeriod,
+        };
+
+        const fallbackResponse = await fetch(`${API_BASE_URL}/items/${id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify(fallbackPayload),
+        });
+
+        if (!fallbackResponse.ok) {
+          return handleResponse(fallbackResponse);
+        }
+
+        const fallbackContentType = fallbackResponse.headers.get('content-type') || '';
+        if (fallbackContentType.includes('application/json')) {
+          return handleResponse(fallbackResponse);
+        }
+        return { success: true };
+      }
+
       return handleResponse(response);
     },
     
@@ -262,6 +352,11 @@ export const api = {
           'Authorization': `Bearer ${token}`,
         },
       });
+      return handleResponse(response);
+    },
+
+    getItemBookings: async (itemId: string) => {
+      const response = await fetch(`${API_BASE_URL}/bookings/item/${itemId}`);
       return handleResponse(response);
     },
     

@@ -13,7 +13,10 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -37,6 +40,7 @@ public class ItemService {
         item.setAvailable(request.getAvailable());
         item.setAvailableDates(request.getAvailableDates());
         item.setLocation(request.getLocation());
+        item.setOwnerPhoneNumber(resolveOwnerPhoneNumber(request.getOwnerPhoneNumber(), owner));
         item.setMinimumRentalPeriod(request.getMinimumRentalPeriod());
         item.setMaximumRentalPeriod(request.getMaximumRentalPeriod());
         item.setOwner(owner);
@@ -67,6 +71,14 @@ public class ItemService {
                 return userRepository.save(user);
             });
     }
+
+    private String resolveOwnerPhoneNumber(String requestedPhoneNumber, User owner) {
+        if (requestedPhoneNumber != null && !requestedPhoneNumber.trim().isEmpty()) {
+            return requestedPhoneNumber.trim();
+        }
+
+        return owner != null ? owner.getPhoneNumber() : null;
+    }
     
     @Transactional
     public Item updateItem(String itemId, ItemRequest request, String userId) {
@@ -87,9 +99,23 @@ public class ItemService {
         item.setAvailable(request.getAvailable());
         item.setAvailableDates(request.getAvailableDates());
         item.setLocation(request.getLocation());
+        item.setOwnerPhoneNumber(resolveOwnerPhoneNumber(request.getOwnerPhoneNumber(), item.getOwner()));
         item.setMinimumRentalPeriod(request.getMinimumRentalPeriod());
         item.setMaximumRentalPeriod(request.getMaximumRentalPeriod());
         
+        return itemRepository.save(item);
+    }
+
+    @Transactional
+    public Item updateAvailableDates(String itemId, Set<LocalDate> availableDates, String userId) {
+        Item item = itemRepository.findById(itemId)
+            .orElseThrow(() -> new RuntimeException("Item not found"));
+
+        if (!item.getOwner().getId().equals(userId)) {
+            throw new RuntimeException("You don't have permission to update this item");
+        }
+
+        item.setAvailableDates(availableDates == null ? new HashSet<>() : new HashSet<>(availableDates));
         return itemRepository.save(item);
     }
     

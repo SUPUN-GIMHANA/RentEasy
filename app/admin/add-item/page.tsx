@@ -14,6 +14,7 @@ import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { api } from "@/lib/api-client"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Calendar } from "@/components/ui/calendar"
 
 const SUBCATEGORIES: Record<string, string[]> = {
   vehicles: ["Cars", "Motorbikes", "Bicycles", "Trucks/Lorries"],
@@ -34,12 +35,14 @@ export default function AddItemPage() {
     subcategory: "",
     price: "",
     location: "",
+    ownerPhoneNumber: "",
     description: "",
     minimumRentalPeriod: "",
     maximumRentalPeriod: "",
   })
   const [uploadedImages, setUploadedImages] = useState<File[]>([])
   const [imagePreview, setImagePreview] = useState<string[]>([])
+  const [availableDates, setAvailableDates] = useState<Date[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -111,6 +114,7 @@ export default function AddItemPage() {
       if (!formData.subcategory?.trim()) missingFields.push("Subcategory")
       if (!formData.price?.trim()) missingFields.push("Price")
       if (!formData.location?.trim()) missingFields.push("Location")
+      if (!formData.ownerPhoneNumber?.trim()) missingFields.push("Mobile Number")
       if (!formData.description?.trim()) missingFields.push("Description")
       
       if (missingFields.length > 0) {
@@ -132,7 +136,14 @@ export default function AddItemPage() {
         subcategory: formData.subcategory,
         price: parseFloat(formData.price),
         location: formData.location,
+        ownerPhoneNumber: formData.ownerPhoneNumber,
         description: formData.description,
+        availableDates: availableDates.map((date) => {
+          const yyyy = date.getFullYear()
+          const mm = String(date.getMonth() + 1).padStart(2, "0")
+          const dd = String(date.getDate()).padStart(2, "0")
+          return `${yyyy}-${mm}-${dd}`
+        }),
         minimumRentalPeriod: formData.minimumRentalPeriod ? parseInt(formData.minimumRentalPeriod) : undefined,
         maximumRentalPeriod: formData.maximumRentalPeriod ? parseInt(formData.maximumRentalPeriod) : undefined,
         available: true,
@@ -141,6 +152,13 @@ export default function AddItemPage() {
 
       // Call API to save item
       const response = await api.items.create(itemData)
+
+      const createdItemId = response?.data?.id || response?.id
+      if (createdItemId && typeof window !== "undefined") {
+        const existingIds = JSON.parse(localStorage.getItem("myCreatedItemIds") || "[]")
+        const nextIds = Array.from(new Set([...existingIds, createdItemId]))
+        localStorage.setItem("myCreatedItemIds", JSON.stringify(nextIds))
+      }
       
       // Success - redirect to items management page
       router.push("/admin/items")
@@ -245,6 +263,18 @@ export default function AddItemPage() {
                   required
                 />
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="ownerPhoneNumber">Mobile Number *</Label>
+                <Input
+                  id="ownerPhoneNumber"
+                  name="ownerPhoneNumber"
+                  type="tel"
+                  placeholder="0771234567"
+                  value={formData.ownerPhoneNumber}
+                  onChange={handleInputChange}
+                  required
+                />
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -337,6 +367,21 @@ export default function AddItemPage() {
                   min="1"
                 />
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Blocked Booking Days</Label>
+              <Calendar
+                mode="multiple"
+                selected={availableDates}
+                onSelect={(dates) => setAvailableDates(dates || [])}
+                disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                modifiersClassNames={{
+                  selected: "bg-red-500 text-white rounded-full",
+                }}
+                className="rounded-md border"
+              />
+              <p className="text-sm text-muted-foreground">{availableDates.length} blocked dates selected</p>
             </div>
           </CardContent>
         </Card>

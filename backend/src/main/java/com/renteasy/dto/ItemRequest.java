@@ -32,6 +32,7 @@ public class ItemRequest {
     private Boolean available = true;
     private Set<LocalDate> availableDates;
     private String location;
+    private String ownerPhoneNumber;
     private Integer minimumRentalPeriod;
     private Integer maximumRentalPeriod;
 }

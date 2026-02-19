@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { createContext, useContext, useState, useEffect } from "react"
-import { api, getStoredUser } from "./api-client"
+import { api, ApiError, getStoredUser } from "./api-client"
 
 interface User {
   id: string
@@ -25,6 +25,7 @@ interface AuthContextType {
   logout: () => void
   isAuthenticated: boolean
   isLoading: boolean
+  authError: string
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -32,6 +33,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [authError, setAuthError] = useState("")
 
   useEffect(() => {
     const loadUser = async () => {
@@ -43,7 +45,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(userData)
         }
       } catch (error) {
-        console.error("Failed to load user:", error)
+        if (!(error instanceof ApiError && (error.status === 401 || error.status === 403))) {
+          console.error("Failed to load user:", error)
+        }
         api.auth.logout()
       } finally {
         setIsLoading(false)
@@ -54,6 +58,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (email: string, password: string) => {
     try {
+      setAuthError("")
       const response = await api.auth.login({ email, password })
       // Fetch full user profile after login
       const userData = await api.users.getProfile()
@@ -71,19 +76,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       })
       return true
     } catch (error) {
-      console.error("Login failed:", error)
+      if (error instanceof ApiError) {
+        setAuthError(error.message)
+      } else {
+        console.error("Login failed:", error)
+        setAuthError("Login failed. Please try again.")
+      }
       return false
     }
   }
 
   const signup = async (data: any) => {
     try {
+      setAuthError("")
       await api.auth.signup(data)
       // Auto login after signup
       const success = await login(data.email, data.password)
       return success
     } catch (error) {
-      console.error("Signup failed:", error)
+      if (error instanceof ApiError) {
+        setAuthError(error.message)
+      } else {
+        console.error("Signup failed:", error)
+        setAuthError("Signup failed. Please try again.")
+      }
       return false
     }
   }
@@ -91,6 +107,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = () => {
     api.auth.logout()
     setUser(null)
+    setAuthError("")
   }
 
   return (
@@ -102,6 +119,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         logout,
         isAuthenticated: !!user,
         isLoading,
+        authError,
       }}
     >
       {children}

@@ -5,10 +5,13 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { Search, Edit, Trash2, Eye, EyeOff, AlertCircle, Loader } from "lucide-react"
+import { Calendar } from "@/components/ui/calendar"
+import { Search, Trash2, AlertCircle, Loader } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 import { api } from "@/lib/api-client"
+import { useAuth } from "@/lib/auth-context"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,21 +25,35 @@ import {
 interface Item {
   id: string
   name: string
+  description?: string
   category: string
+  subcategory?: string
   price: number
   status: "ACTIVE" | "INACTIVE"
+  ownerId?: string
   views?: number
   imageUrl?: string
-  description?: string
+  additionalImages?: string[]
+  available?: boolean
+  availableDates?: string[]
+  location?: string
+  ownerPhoneNumber?: string
+  minimumRentalPeriod?: number
+  maximumRentalPeriod?: number
 }
 
 export default function ManageItemsPage() {
+  const { user } = useAuth()
   const [items, setItems] = useState<Item[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [searchQuery, setSearchQuery] = useState("")
   const [deleteItemId, setDeleteItemId] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [bookingDatesItem, setBookingDatesItem] = useState<Item | null>(null)
+  const [selectedBookingDates, setSelectedBookingDates] = useState<Date[]>([])
+  const [isLoadingBookingDates, setIsLoadingBookingDates] = useState(false)
+  const [isSavingBookingDates, setIsSavingBookingDates] = useState(false)
 
   useEffect(() => {
     loadItems()
@@ -46,8 +63,50 @@ export default function ManageItemsPage() {
     try {
       setLoading(true)
       setError("")
-      const response = await api.items.getMyItems()
-      setItems(response || [])
+
+      const normalizeItems = (rawItems: any[]): Item[] => {
+        return (rawItems || []).map((item) => ({
+          id: item.id,
+          name: item.name,
+          category: item.category,
+          price: Number(item.price || 0),
+          status: item.status || (item.available ? "ACTIVE" : "INACTIVE"),
+          ownerId: item.ownerId,
+          views: item.views,
+          imageUrl: item.imageUrl,
+          description: item.description,
+          subcategory: item.subcategory,
+          additionalImages: item.additionalImages,
+          available: item.available,
+          availableDates: item.availableDates,
+          location: item.location,
+          ownerPhoneNumber: item.ownerPhoneNumber,
+          minimumRentalPeriod: item.minimumRentalPeriod,
+          maximumRentalPeriod: item.maximumRentalPeriod,
+        }))
+      }
+
+      const myItemsResponse = await api.items.getMyItems().catch(() => [])
+      let normalizedItems = normalizeItems(myItemsResponse || [])
+
+      if (normalizedItems.length === 0) {
+        const allItemsResponse = await api.items.getAll(0, 200).catch(() => ({ content: [] }))
+        const allItems = normalizeItems(allItemsResponse?.content || allItemsResponse || [])
+
+        if (user?.id) {
+          normalizedItems = allItems.filter((item) => item.ownerId === user.id)
+        }
+
+        if (normalizedItems.length === 0 && typeof window !== "undefined") {
+          const createdIds: string[] = JSON.parse(localStorage.getItem("myCreatedItemIds") || "[]")
+          if (createdIds.length > 0) {
+            const createdIdSet = new Set(createdIds)
+            normalizedItems = allItems.filter((item) => createdIdSet.has(item.id))
+          }
+        }
+      }
+
+      setItems(normalizedItems)
     } catch (err) {
       console.error("Failed to load items:", err)
       setError("Failed to load items")
@@ -69,6 +128,10 @@ export default function ManageItemsPage() {
     setIsDeleting(true)
     try {
       await api.items.delete(itemId)
+      if (typeof window !== "undefined") {
+        const createdIds: string[] = JSON.parse(localStorage.getItem("myCreatedItemIds") || "[]")
+        localStorage.setItem("myCreatedItemIds", JSON.stringify(createdIds.filter((id) => id !== itemId)))
+      }
       setItems(items.filter((item) => item.id !== itemId))
       setDeleteItemId(null)
     } catch (err) {
@@ -76,6 +139,65 @@ export default function ManageItemsPage() {
       setError("Failed to delete item")
     } finally {
       setIsDeleting(false)
+    }
+  }
+
+  const toDateFromIso = (dateString: string) => {
+    const [year, month, day] = dateString.split("-").map(Number)
+    return new Date(year, (month || 1) - 1, day || 1)
+  }
+
+  const toIsoDate = (date: Date) => {
+    const yyyy = date.getFullYear()
+    const mm = String(date.getMonth() + 1).padStart(2, "0")
+    const dd = String(date.getDate()).padStart(2, "0")
+    return `${yyyy}-${mm}-${dd}`
+  }
+
+  const handleOpenBookingDates = async (itemId: string) => {
+    setIsLoadingBookingDates(true)
+    setError("")
+    try {
+      const itemDetails = await api.items.getById(itemId)
+      setBookingDatesItem(itemDetails)
+      setSelectedBookingDates((itemDetails.availableDates || []).map((date: string) => toDateFromIso(date)))
+    } catch (err) {
+      console.error("Failed to load item booking dates:", err)
+      setError("Failed to load booking dates")
+      setBookingDatesItem(null)
+      setSelectedBookingDates([])
+    } finally {
+      setIsLoadingBookingDates(false)
+    }
+  }
+
+  const handleSaveBookingDates = async () => {
+    if (!bookingDatesItem) {
+      return
+    }
+
+    setIsSavingBookingDates(true)
+    setError("")
+
+    try {
+      const nextDates = selectedBookingDates.map(toIsoDate)
+      await api.items.updateBookingDates(bookingDatesItem.id, nextDates, bookingDatesItem)
+
+      setItems((prev) =>
+        prev.map((item) =>
+          item.id === bookingDatesItem.id
+            ? { ...item, availableDates: nextDates }
+            : item
+        )
+      )
+
+      setBookingDatesItem(null)
+      setSelectedBookingDates([])
+    } catch (err) {
+      console.error("Failed to save booking dates:", err)
+      setError("Failed to save booking dates")
+    } finally {
+      setIsSavingBookingDates(false)
     }
   }
 
@@ -157,7 +279,7 @@ export default function ManageItemsPage() {
             >
               <CardContent className="p-4">
                 <div className="flex items-center gap-4">
-                  <div className="relative h-20 w-20 rounded-lg overflow-hidden flex-shrink-0 bg-gray-100">
+                  <div className="relative h-20 w-20 rounded-lg overflow-hidden shrink-0 bg-gray-100">
                     {item.imageUrl && (
                       <Image
                         src={item.imageUrl}
@@ -192,18 +314,27 @@ export default function ManageItemsPage() {
                       {item.status === "ACTIVE" ? "Active" : "Inactive"}
                     </Badge>
                     <Link href={`/admin/edit-item/${item.id}`}>
-                      <Button variant="outline" size="icon">
-                        <Edit className="h-4 w-4" />
+                      <Button variant="outline" size="sm">
+                        Update
                       </Button>
                     </Link>
                     <Button
                       variant="outline"
-                      size="icon"
+                      size="sm"
+                      onClick={() => handleOpenBookingDates(item.id)}
+                      disabled={isLoadingBookingDates}
+                    >
+                      {isLoadingBookingDates ? "Loading..." : "Block Days"}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
                       className="text-destructive bg-transparent"
                       onClick={() => setDeleteItemId(item.id)}
                       disabled={isDeleting}
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Remove
                     </Button>
                   </div>
                 </div>
@@ -233,6 +364,43 @@ export default function ManageItemsPage() {
           </div>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={bookingDatesItem !== null} onOpenChange={(open) => !open && setBookingDatesItem(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Mark Blocked Booking Days</DialogTitle>
+            <DialogDescription>
+              Select dates that users cannot book for this item. These marked days will appear as red circles.
+            </DialogDescription>
+          </DialogHeader>
+
+          {bookingDatesItem && (
+            <div className="space-y-4">
+              <p className="text-sm font-medium">{bookingDatesItem.name}</p>
+              <Calendar
+                mode="multiple"
+                selected={selectedBookingDates}
+                onSelect={(dates) => setSelectedBookingDates(dates || [])}
+                disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                modifiersClassNames={{
+                  selected: "bg-red-500 text-white rounded-full",
+                }}
+                className="rounded-md border"
+              />
+              <p className="text-sm text-muted-foreground">{selectedBookingDates.length} blocked dates selected</p>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBookingDatesItem(null)} disabled={isSavingBookingDates}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveBookingDates} disabled={isSavingBookingDates || !bookingDatesItem}>
+              {isSavingBookingDates ? "Saving..." : "Save Blocked Days"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

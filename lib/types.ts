@@ -7,6 +7,7 @@ export interface Item {
   imageUrl: string
   available: boolean
   availableDates: string[]
+  ownerPhoneNumber?: string
 }
 
 export interface Booking {

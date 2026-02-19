@@ -27,6 +27,7 @@ public class ItemDTO {
     private String location;
     private Integer minimumRentalPeriod;
     private Integer maximumRentalPeriod;
+    private String ownerPhoneNumber;
     private Integer views;
     private Boolean boosted;
     private LocalDateTime boostedUntil;

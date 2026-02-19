@@ -28,7 +28,7 @@ export default function SignupPage() {
   })
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
-  const { signup } = useAuth()
+  const { signup, authError } = useAuth()
   const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -54,7 +54,7 @@ export default function SignupPage() {
     if (success) {
       router.push("/browse")
     } else {
-      setError("Signup failed. Please try again.")
+      setError(authError || "Signup failed. Please try again.")
     }
   }
 

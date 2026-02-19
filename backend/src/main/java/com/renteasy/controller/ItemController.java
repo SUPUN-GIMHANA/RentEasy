@@ -16,9 +16,12 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @RestController
@@ -35,9 +38,11 @@ public class ItemController {
             @RequestParam(value = "subcategory", required = false) String subcategory,
             @RequestParam("price") String price,
             @RequestParam("location") String location,
+            @RequestParam(value = "ownerPhoneNumber", required = false) String ownerPhoneNumber,
             @RequestParam("description") String description,
             @RequestParam(value = "minimumRentalPeriod", required = false) String minimumRentalPeriod,
             @RequestParam(value = "maximumRentalPeriod", required = false) String maximumRentalPeriod,
+            @RequestParam(value = "availableDates", required = false) List<String> availableDates,
             @RequestParam(value = "available", required = false, defaultValue = "true") String available,
             @RequestParam(value = "imageFile", required = false) MultipartFile imageFile,
             @RequestParam(value = "additionalImageFiles", required = false) MultipartFile[] additionalImageFiles,
@@ -52,6 +57,7 @@ public class ItemController {
             }
             request.setPrice(new java.math.BigDecimal(price));
             request.setLocation(location);
+            request.setOwnerPhoneNumber(ownerPhoneNumber);
             request.setDescription(description);
             request.setAvailable(Boolean.parseBoolean(available));
             
@@ -60,6 +66,15 @@ public class ItemController {
             }
             if (maximumRentalPeriod != null && !maximumRentalPeriod.isEmpty()) {
                 request.setMaximumRentalPeriod(Integer.parseInt(maximumRentalPeriod));
+            }
+            if (availableDates != null && !availableDates.isEmpty()) {
+                Set<LocalDate> parsedDates = new HashSet<>();
+                for (String date : availableDates) {
+                    if (date != null && !date.trim().isEmpty()) {
+                        parsedDates.add(LocalDate.parse(date.trim()));
+                    }
+                }
+                request.setAvailableDates(parsedDates);
             }
             
             // Convert image files to base64
@@ -208,6 +223,29 @@ public class ItemController {
         List<Item> items = itemService.getUserItems(userId);
         return ResponseEntity.ok(items.stream().map(this::convertToDTO).collect(Collectors.toList()));
     }
+
+    @PatchMapping("/{id}/booking-dates")
+    public ResponseEntity<?> updateBookingDates(@PathVariable String id,
+                                                @RequestBody List<String> availableDates,
+                                                Authentication authentication) {
+        try {
+            String userId = getUserIdFromAuthentication(authentication);
+            Set<LocalDate> parsedDates = new HashSet<>();
+            if (availableDates != null) {
+                for (String date : availableDates) {
+                    if (date != null && !date.trim().isEmpty()) {
+                        parsedDates.add(LocalDate.parse(date.trim()));
+                    }
+                }
+            }
+
+            Item item = itemService.updateAvailableDates(id, parsedDates, userId);
+            return ResponseEntity.ok(new ApiResponse(true, "Booking dates updated successfully", convertToDTO(item)));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest()
+                .body(new ApiResponse(false, e.getMessage()));
+        }
+    }
     
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteItem(@PathVariable String id, 
@@ -248,6 +286,11 @@ public class ItemController {
         dto.setAvailableDates(item.getAvailableDates() == null ? null
             : item.getAvailableDates().stream().map(java.time.LocalDate::toString).collect(Collectors.toList()));
         dto.setLocation(item.getLocation());
+        String ownerPhoneNumber = item.getOwnerPhoneNumber();
+        if ((ownerPhoneNumber == null || ownerPhoneNumber.trim().isEmpty()) && item.getOwner() != null) {
+            ownerPhoneNumber = item.getOwner().getPhoneNumber();
+        }
+        dto.setOwnerPhoneNumber(ownerPhoneNumber);
         dto.setMinimumRentalPeriod(item.getMinimumRentalPeriod());
         dto.setMaximumRentalPeriod(item.getMaximumRentalPeriod());
         dto.setViews(item.getViews());
@@ -260,4 +303,5 @@ public class ItemController {
             dto.setOwnerName(item.getOwner().getFirstName() + " " + item.getOwner().getLastName());
         }
         return dto;
-    }}
+    }
+}
