@@ -10,6 +10,13 @@ export interface StoredOffer {
   status?: string
 }
 
+const getOffersStorageKey = (userId?: string) => {
+  if (userId) {
+    return `offers:${userId}`
+  }
+  return "offers"
+}
+
 const toIsoDay = (date: Date) => {
   const yyyy = date.getFullYear()
   const mm = String(date.getMonth() + 1).padStart(2, "0")
@@ -17,17 +24,26 @@ const toIsoDay = (date: Date) => {
   return `${yyyy}-${mm}-${dd}`
 }
 
-export const getStoredOffers = (): StoredOffer[] => {
+export const getStoredOffers = (userId?: string): StoredOffer[] => {
   if (typeof window === "undefined") {
     return []
   }
 
   try {
-    const raw = JSON.parse(localStorage.getItem("offers") || "[]")
+    const raw = JSON.parse(localStorage.getItem(getOffersStorageKey(userId)) || "[]")
     return Array.isArray(raw) ? raw : []
   } catch {
     return []
   }
+}
+
+export const saveStoredOffer = (offer: StoredOffer, userId?: string) => {
+  if (typeof window === "undefined") {
+    return
+  }
+
+  const existingOffers = getStoredOffers(userId)
+  localStorage.setItem(getOffersStorageKey(userId), JSON.stringify([offer, ...existingOffers]))
 }
 
 export const getActiveOfferForItem = (itemId: string, offers: StoredOffer[], now = new Date()) => {

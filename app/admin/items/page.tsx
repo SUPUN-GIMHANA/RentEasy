@@ -60,8 +60,8 @@ export default function ManageItemsPage() {
 
   useEffect(() => {
     loadItems()
-    setOffers(getStoredOffers())
-  }, [])
+    setOffers(getStoredOffers(user?.id))
+  }, [user?.id])
 
   const loadItems = async () => {
     try {
@@ -102,7 +102,8 @@ export default function ManageItemsPage() {
         }
 
         if (normalizedItems.length === 0 && typeof window !== "undefined") {
-          const createdIds: string[] = JSON.parse(localStorage.getItem("myCreatedItemIds") || "[]")
+          const createdItemsKey = user?.id ? `myCreatedItemIds:${user.id}` : "myCreatedItemIds"
+          const createdIds: string[] = JSON.parse(localStorage.getItem(createdItemsKey) || "[]")
           if (createdIds.length > 0) {
             const createdIdSet = new Set(createdIds)
             normalizedItems = allItems.filter((item) => createdIdSet.has(item.id))
@@ -157,8 +158,9 @@ export default function ManageItemsPage() {
     try {
       await api.items.delete(itemId)
       if (typeof window !== "undefined") {
-        const createdIds: string[] = JSON.parse(localStorage.getItem("myCreatedItemIds") || "[]")
-        localStorage.setItem("myCreatedItemIds", JSON.stringify(createdIds.filter((id) => id !== itemId)))
+        const createdItemsKey = user?.id ? `myCreatedItemIds:${user.id}` : "myCreatedItemIds"
+        const createdIds: string[] = JSON.parse(localStorage.getItem(createdItemsKey) || "[]")
+        localStorage.setItem(createdItemsKey, JSON.stringify(createdIds.filter((id) => id !== itemId)))
       }
       setItems(items.filter((item) => item.id !== itemId))
       setDeleteItemId(null)

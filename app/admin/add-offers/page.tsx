@@ -13,6 +13,7 @@ import { useRouter } from "next/navigation"
 import Image from "next/image"
 import { api } from "@/lib/api-client"
 import { useAuth } from "@/lib/auth-context"
+import { saveStoredOffer } from "@/lib/offer-utils"
 
 interface OfferItem {
   id: string
@@ -70,7 +71,8 @@ export default function AddOffersPage() {
         }
 
         if (normalizedItems.length === 0 && typeof window !== "undefined") {
-          const createdIds: string[] = JSON.parse(localStorage.getItem("myCreatedItemIds") || "[]")
+          const createdItemsKey = user?.id ? `myCreatedItemIds:${user.id}` : "myCreatedItemIds"
+          const createdIds: string[] = JSON.parse(localStorage.getItem(createdItemsKey) || "[]")
           if (createdIds.length > 0) {
             const createdIdSet = new Set(createdIds)
             normalizedItems = allItemsData.filter((item) => createdIdSet.has(item.id))
@@ -130,10 +132,7 @@ export default function AddOffersPage() {
       status: "active",
     }
 
-    if (typeof window !== "undefined") {
-      const existingOffers = JSON.parse(localStorage.getItem("offers") || "[]")
-      localStorage.setItem("offers", JSON.stringify([newOffer, ...existingOffers]))
-    }
+    saveStoredOffer(newOffer, user?.id)
 
     router.push("/admin/items")
   }

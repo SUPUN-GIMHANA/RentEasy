@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Upload, X } from "lucide-react"
 import Image from "next/image"
 import { useRouter, useParams } from "next/navigation"
+import { api } from "@/lib/api-client"
 
 const SUBCATEGORIES: Record<string, string[]> = {
   vehicles: ["Cars", "Motorbikes", "Bicycles", "Trucks/Lorries"],
@@ -41,27 +42,42 @@ export default function EditItemPage() {
   })
   const [uploadedImages, setUploadedImages] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const items = JSON.parse(localStorage.getItem("rentalItems") || "[]")
-      const item = items.find((i: any) => i.id === itemId)
-      if (item) {
+    const loadItem = async () => {
+      try {
+        setLoading(true)
+        setError("")
+
+        const myItems = await api.items.getMyItems()
+        const item = (myItems || []).find((entry: any) => entry.id === itemId)
+
+        if (!item) {
+          setError("Item not found in your account")
+          return
+        }
+
         setFormData({
           name: item.name,
           category: item.category,
           subcategory: item.subcategory || "",
-          price: item.price.toString(),
+          price: String(item.price || ""),
           location: item.location || "",
           description: item.description || "",
-          availableFrom: item.availableFrom || "",
-          availableTo: item.availableTo || "",
+          availableFrom: "",
+          availableTo: "",
         })
-        setUploadedImages(item.images || [item.image])
+        setUploadedImages(item.additionalImages?.length ? item.additionalImages : [item.imageUrl].filter(Boolean))
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load item")
+      } finally {
+        setLoading(false)
       }
     }
-    setLoading(false)
+
+    loadItem()
   }, [itemId])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -106,32 +122,27 @@ export default function EditItemPage() {
     setUploadedImages((prev) => prev.filter((_, i) => i !== index))
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
     const updatedItem = {
-      id: itemId,
       name: formData.name,
       category: formData.category,
       subcategory: formData.subcategory,
       price: parseInt(formData.price),
       location: formData.location,
       description: formData.description,
-      status: "active",
-      views: 0,
-      image: uploadedImages[0] || "/placeholder.svg",
-      images: uploadedImages,
-      availableFrom: formData.availableFrom,
-      availableTo: formData.availableTo,
+      available: true,
+      imageUrl: uploadedImages[0] || "/placeholder.svg",
+      additionalImages: uploadedImages,
     }
 
-    if (typeof window !== "undefined") {
-      const items = JSON.parse(localStorage.getItem("rentalItems") || "[]")
-      const updated = items.map((item: any) => (item.id === itemId ? updatedItem : item))
-      localStorage.setItem("rentalItems", JSON.stringify(updated))
+    try {
+      await api.items.update(itemId, updatedItem)
+      router.push("/admin/items")
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update item")
     }
-
-    router.push("/admin/items")
   }
 
   const availableSubcategories = formData.category ? SUBCATEGORIES[formData.category] || [] : []
@@ -146,6 +157,12 @@ export default function EditItemPage() {
         <h1 className="text-3xl font-bold mb-2">Edit Item</h1>
         <p className="text-muted-foreground">Update rental item details and images</p>
       </div>
+
+      {error && (
+        <Card className="bg-red-50 border-red-200">
+          <CardContent className="p-4 text-sm text-red-900">{error}</CardContent>
+        </Card>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <Card className="transition-all duration-300 hover:shadow-lg">

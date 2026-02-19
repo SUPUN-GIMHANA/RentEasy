@@ -11,6 +11,7 @@ import { Upload, X } from "lucide-react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { api } from "@/lib/api-client"
+import { useAuth } from "@/lib/auth-context"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Calendar } from "@/components/ui/calendar"
 
@@ -27,6 +28,7 @@ const SUBCATEGORIES: Record<string, string[]> = {
 
 export default function AddAdvertisementPage() {
   const router = useRouter()
+  const { user } = useAuth()
   const [formData, setFormData] = useState({
     name: "",
     category: "",
@@ -147,9 +149,10 @@ export default function AddAdvertisementPage() {
 
       const createdItemId = response?.data?.id || response?.id
       if (createdItemId && typeof window !== "undefined") {
-        const existingIds = JSON.parse(localStorage.getItem("myCreatedItemIds") || "[]")
+        const createdItemsKey = user?.id ? `myCreatedItemIds:${user.id}` : "myCreatedItemIds"
+        const existingIds = JSON.parse(localStorage.getItem(createdItemsKey) || "[]")
         const nextIds = Array.from(new Set([...existingIds, createdItemId]))
-        localStorage.setItem("myCreatedItemIds", JSON.stringify(nextIds))
+        localStorage.setItem(createdItemsKey, JSON.stringify(nextIds))
       }
       
       // Success - redirect to items management page

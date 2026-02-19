@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Zap } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Image from "next/image"
+import { api } from "@/lib/api-client"
 
 const boostPlans = [
   {
@@ -51,13 +52,25 @@ export default function SelectPlanPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const itemId = searchParams.get("itemId")
-    if (itemId && typeof window !== "undefined") {
-      const items = JSON.parse(localStorage.getItem("rentalItems") || "[]")
-      const item = items.find((i: any) => i.id === itemId)
-      setSelectedItem(item)
+    const loadSelectedItem = async () => {
+      const itemId = searchParams.get("itemId")
+      if (!itemId) {
+        setLoading(false)
+        return
+      }
+
+      try {
+        const myItems = await api.items.getMyItems()
+        const item = (myItems || []).find((entry: any) => entry.id === itemId)
+        setSelectedItem(item || null)
+      } catch {
+        setSelectedItem(null)
+      } finally {
+        setLoading(false)
+      }
     }
-    setLoading(false)
+
+    loadSelectedItem()
   }, [searchParams])
 
   const handleSelectPlan = (planId: string, planName: string, price: number) => {
@@ -99,7 +112,7 @@ export default function SelectPlanPage() {
           <div className="flex items-center gap-4">
             <div className="relative h-20 w-20 rounded-lg overflow-hidden flex-shrink-0">
               <Image
-                src={selectedItem.image || "/placeholder.svg"}
+                src={selectedItem.imageUrl || selectedItem.image || "/placeholder.svg"}
                 alt={selectedItem.name}
                 fill
                 className="object-cover"

@@ -8,10 +8,13 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useRouter, useSearchParams } from "next/navigation"
+import { api } from "@/lib/api-client"
+import { useAuth } from "@/lib/auth-context"
 
 export default function PaymentPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { user } = useAuth()
   const [formData, setFormData] = useState({
     cardName: "",
     cardNumber: "",
@@ -26,11 +29,22 @@ export default function PaymentPage() {
   const itemId = searchParams.get("itemId") || ""
 
   useEffect(() => {
-    if (itemId && typeof window !== "undefined") {
-      const items = JSON.parse(localStorage.getItem("rentalItems") || "[]")
-      const item = items.find((i: any) => i.id === itemId)
-      setSelectedItem(item)
+    const loadSelectedItem = async () => {
+      if (!itemId) {
+        setSelectedItem(null)
+        return
+      }
+
+      try {
+        const myItems = await api.items.getMyItems()
+        const item = (myItems || []).find((entry: any) => entry.id === itemId)
+        setSelectedItem(item || null)
+      } catch {
+        setSelectedItem(null)
+      }
     }
+
+    loadSelectedItem()
   }, [itemId])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -71,12 +85,13 @@ export default function PaymentPage() {
         name: selectedItem.name,
         plan: planName,
         daysLeft: daysMap[planName] || 7,
-        image: selectedItem.image,
+        image: selectedItem.imageUrl || selectedItem.image,
       }
 
       if (typeof window !== "undefined") {
-        const activeBoosts = JSON.parse(localStorage.getItem("boostedItems") || "[]")
-        localStorage.setItem("boostedItems", JSON.stringify([...activeBoosts, newBoost]))
+        const boostedItemsKey = user?.id ? `boostedItems:${user.id}` : "boostedItems"
+        const activeBoosts = JSON.parse(localStorage.getItem(boostedItemsKey) || "[]")
+        localStorage.setItem(boostedItemsKey, JSON.stringify([...activeBoosts, newBoost]))
       }
     }
 
@@ -93,7 +108,7 @@ export default function PaymentPage() {
         <p className="text-muted-foreground">Secure payment for boost plan</p>
       </div>
 
-      <Card className="bg-gradient-to-r from-blue-50 to-cyan-50">
+      <Card className="bg-linear-to-r from-blue-50 to-cyan-50">
         <CardContent className="p-6 space-y-4">
           <div className="flex justify-between items-center pb-4 border-b">
             <div>

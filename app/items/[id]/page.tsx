@@ -26,7 +26,7 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
   const [copiedNumber, setCopiedNumber] = useState(false)
   const [offer, setOffer] = useState<StoredOffer | null>(null)
   const [offerDialogOpen, setOfferDialogOpen] = useState(false)
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, user } = useAuth()
   const router = useRouter()
 
   useEffect(() => {
@@ -59,7 +59,7 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
         if (isMounted) {
           setItem(data)
           setBookedDateSet(nextBookedDates)
-          setOffer(getActiveOfferForItem(data.id, getStoredOffers()) || null)
+          setOffer(getActiveOfferForItem(data.id, getStoredOffers(user?.id)) || null)
         }
       } catch (err) {
         if (isMounted) {
@@ -77,7 +77,7 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
     return () => {
       isMounted = false
     }
-  }, [id])
+  }, [id, user?.id])
 
   if (loading) {
     return (

@@ -21,13 +21,33 @@ const getAuthToken = () => {
 const SAVED_ITEM_IDS_KEY = 'savedItemIds';
 const SAVED_ITEMS_MAP_KEY = 'savedItemsMap';
 
+const getCurrentUserId = (): string => {
+  if (typeof window === 'undefined') {
+    return 'anonymous';
+  }
+
+  try {
+    const rawUser = localStorage.getItem('user');
+    if (!rawUser) {
+      return 'anonymous';
+    }
+
+    const parsedUser = JSON.parse(rawUser);
+    return parsedUser?.id ? String(parsedUser.id) : 'anonymous';
+  } catch {
+    return 'anonymous';
+  }
+};
+
+const getScopedKey = (baseKey: string) => `${baseKey}:${getCurrentUserId()}`;
+
 const getLocalSavedItemIds = (): string[] => {
   if (typeof window === 'undefined') {
     return [];
   }
 
   try {
-    const raw = localStorage.getItem(SAVED_ITEM_IDS_KEY);
+    const raw = localStorage.getItem(getScopedKey(SAVED_ITEM_IDS_KEY));
     const parsed = raw ? JSON.parse(raw) : [];
     return Array.isArray(parsed) ? parsed : [];
   } catch {
@@ -39,7 +59,7 @@ const setLocalSavedItemIds = (ids: string[]) => {
   if (typeof window === 'undefined') {
     return;
   }
-  localStorage.setItem(SAVED_ITEM_IDS_KEY, JSON.stringify(Array.from(new Set(ids))));
+  localStorage.setItem(getScopedKey(SAVED_ITEM_IDS_KEY), JSON.stringify(Array.from(new Set(ids))));
 };
 
 const getLocalSavedItemsMap = (): Record<string, any> => {
@@ -48,7 +68,7 @@ const getLocalSavedItemsMap = (): Record<string, any> => {
   }
 
   try {
-    const raw = localStorage.getItem(SAVED_ITEMS_MAP_KEY);
+    const raw = localStorage.getItem(getScopedKey(SAVED_ITEMS_MAP_KEY));
     const parsed = raw ? JSON.parse(raw) : {};
     return parsed && typeof parsed === 'object' ? parsed : {};
   } catch {
@@ -60,7 +80,7 @@ const setLocalSavedItemsMap = (map: Record<string, any>) => {
   if (typeof window === 'undefined') {
     return;
   }
-  localStorage.setItem(SAVED_ITEMS_MAP_KEY, JSON.stringify(map || {}));
+  localStorage.setItem(getScopedKey(SAVED_ITEMS_MAP_KEY), JSON.stringify(map || {}));
 };
 
 // Helper function to handle API responses

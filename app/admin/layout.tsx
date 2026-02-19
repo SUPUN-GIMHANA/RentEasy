@@ -6,8 +6,30 @@ import { AdminSidebar } from "@/components/admin-sidebar"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft } from "lucide-react"
 import Link from "next/link"
+import { useAuth } from "@/lib/auth-context"
+import { useRouter, usePathname } from "next/navigation"
+import { useEffect } from "react"
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, isLoading } = useAuth()
+  const router = useRouter()
+  const pathname = usePathname()
+
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      const redirect = encodeURIComponent(pathname || "/admin")
+      router.replace(`/login?redirect=${redirect}`)
+    }
+  }, [isLoading, isAuthenticated, pathname, router])
+
+  if (isLoading) {
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>
+  }
+
+  if (!isAuthenticated) {
+    return null
+  }
+
   return (
     <div className="flex min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50">
       <AdminSidebar />
