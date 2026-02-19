@@ -259,6 +259,20 @@ public class ItemController {
                 .body(new ApiResponse(false, e.getMessage()));
         }
     }
+
+    @PatchMapping("/{id}/boost")
+    public ResponseEntity<?> boostItem(@PathVariable String id,
+                                       @RequestParam(defaultValue = "7") int durationDays,
+                                       Authentication authentication) {
+        try {
+            String userId = getUserIdFromAuthentication(authentication);
+            Item item = itemService.boostItem(id, durationDays, userId);
+            return ResponseEntity.ok(new ApiResponse(true, "Item boosted successfully", convertToDTO(item)));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest()
+                .body(new ApiResponse(false, e.getMessage()));
+        }
+    }
     
     private String getUserIdFromAuthentication(Authentication authentication) {
         if (authentication == null || !authentication.isAuthenticated()) {

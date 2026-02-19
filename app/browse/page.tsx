@@ -9,9 +9,11 @@ import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { api } from "@/lib/api-client"
-import { Search, Star } from "lucide-react"
+import { Search, Star, Heart } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
+import { useAuth } from "@/lib/auth-context"
+import { useRouter } from "next/navigation"
 
 const categories = ["vehicles", "properties", "electronics", "clothing", "tools", "sports", "camping", "events"]
 
@@ -39,6 +41,8 @@ interface Item {
 }
 
 export default function BrowsePage() {
+  const { isAuthenticated } = useAuth()
+  const router = useRouter()
   const [items, setItems] = useState<Item[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
@@ -48,10 +52,30 @@ export default function BrowsePage() {
   const [selectedCategory, setSelectedCategory] = useState("all")
   const [selectedSubcategory, setSelectedSubcategory] = useState("all")
   const [sortBy, setSortBy] = useState("name")
+  const [savedItemIds, setSavedItemIds] = useState<Set<string>>(new Set())
+  const [savingItemId, setSavingItemId] = useState<string | null>(null)
 
   useEffect(() => {
     loadItems()
   }, [page, selectedCategory, selectedSubcategory])
+
+  useEffect(() => {
+    const loadSavedItems = async () => {
+      if (!isAuthenticated) {
+        setSavedItemIds(new Set())
+        return
+      }
+
+      try {
+        const savedItems = await api.users.getSavedItems()
+        setSavedItemIds(new Set((savedItems || []).map((item: any) => item.id)))
+      } catch {
+        setSavedItemIds(new Set())
+      }
+    }
+
+    loadSavedItems()
+  }, [isAuthenticated])
 
   useEffect(() => {
     // Reset subcategory and page when category changes
@@ -133,6 +157,35 @@ export default function BrowsePage() {
 
   const availableSubcategories = selectedCategory !== "all" ? subcategories[selectedCategory] || [] : []
 
+  const handleToggleSaveItem = async (itemId: string) => {
+    if (!isAuthenticated) {
+      router.push(`/login?redirect=/browse`)
+      return
+    }
+
+    setSavingItemId(itemId)
+    const isSaved = savedItemIds.has(itemId)
+
+    try {
+      if (isSaved) {
+        await api.users.unsaveItem(itemId)
+        setSavedItemIds((prev) => {
+          const next = new Set(prev)
+          next.delete(itemId)
+          return next
+        })
+      } else {
+        const itemData = items.find((entry) => entry.id === itemId)
+        await api.users.saveItem(itemId, itemData)
+        setSavedItemIds((prev) => new Set([...prev, itemId]))
+      }
+    } catch (error) {
+      console.error("Failed to update saved item:", error)
+    } finally {
+      setSavingItemId(null)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -172,7 +225,7 @@ export default function BrowsePage() {
 
           <div className="flex flex-wrap gap-4" suppressHydrationWarning>
             <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-              <SelectTrigger className="w-full md:w-[180px]">
+              <SelectTrigger className="w-full md:w-45">
                 <SelectValue placeholder="Category" />
               </SelectTrigger>
               <SelectContent>
@@ -187,7 +240,7 @@ export default function BrowsePage() {
 
             {availableSubcategories.length > 0 && (
               <Select value={selectedSubcategory} onValueChange={setSelectedSubcategory}>
-                <SelectTrigger className="w-full md:w-[200px]">
+                <SelectTrigger className="w-full md:w-50">
                   <SelectValue placeholder="Subcategory" />
                 </SelectTrigger>
                 <SelectContent>
@@ -202,7 +255,7 @@ export default function BrowsePage() {
             )}
 
             <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger className="w-full md:w-[180px]">
+              <SelectTrigger className="w-full md:w-45">
                 <SelectValue placeholder="Sort By" />
               </SelectTrigger>
               <SelectContent>
@@ -262,6 +315,19 @@ export default function BrowsePage() {
                           fill
                           className="object-cover rounded-t-lg"
                         />
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            handleToggleSaveItem(item.id)
+                          }}
+                          disabled={savingItemId === item.id}
+                          className="absolute top-2 left-2 h-9 w-9 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center hover:bg-white transition-colors disabled:opacity-60"
+                        >
+                          <Heart
+                            className={`h-4 w-4 ${savedItemIds.has(item.id) ? "fill-red-500 text-red-500" : "text-muted-foreground"}`}
+                          />
+                        </button>
                         {!item.available && (
                           <Badge className="absolute top-2 right-2 bg-destructive">Unavailable</Badge>
                         )}

@@ -11,6 +11,10 @@ import java.util.List;
 
 @Repository
 public interface AdvertisementRepository extends JpaRepository<Advertisement, String> {
+
+       List<Advertisement> findAllByOrderByCreatedAtDesc();
+
+       List<Advertisement> findByActiveTrueOrderByCreatedAtDesc();
     
     @Query("SELECT a FROM Advertisement a WHERE a.active = true AND " +
            "a.startDate <= :now AND a.endDate >= :now AND a.position = :position")

@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -116,6 +117,25 @@ public class ItemService {
         }
 
         item.setAvailableDates(availableDates == null ? new HashSet<>() : new HashSet<>(availableDates));
+        return itemRepository.save(item);
+    }
+
+    @Transactional
+    public Item boostItem(String itemId, int durationDays, String userId) {
+        Item item = itemRepository.findById(itemId)
+            .orElseThrow(() -> new RuntimeException("Item not found"));
+
+        if (!item.getOwner().getId().equals(userId)) {
+            throw new RuntimeException("You don't have permission to boost this item");
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime currentBoostUntil = item.getBoostedUntil();
+        LocalDateTime boostStart = (currentBoostUntil != null && currentBoostUntil.isAfter(now)) ? currentBoostUntil : now;
+
+        item.setBoosted(true);
+        item.setBoostedUntil(boostStart.plusDays(durationDays));
+
         return itemRepository.save(item);
     }
     

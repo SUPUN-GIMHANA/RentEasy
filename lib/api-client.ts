@@ -18,6 +18,51 @@ const getAuthToken = () => {
   return null;
 };
 
+const SAVED_ITEM_IDS_KEY = 'savedItemIds';
+const SAVED_ITEMS_MAP_KEY = 'savedItemsMap';
+
+const getLocalSavedItemIds = (): string[] => {
+  if (typeof window === 'undefined') {
+    return [];
+  }
+
+  try {
+    const raw = localStorage.getItem(SAVED_ITEM_IDS_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
+const setLocalSavedItemIds = (ids: string[]) => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  localStorage.setItem(SAVED_ITEM_IDS_KEY, JSON.stringify(Array.from(new Set(ids))));
+};
+
+const getLocalSavedItemsMap = (): Record<string, any> => {
+  if (typeof window === 'undefined') {
+    return {};
+  }
+
+  try {
+    const raw = localStorage.getItem(SAVED_ITEMS_MAP_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+};
+
+const setLocalSavedItemsMap = (map: Record<string, any>) => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  localStorage.setItem(SAVED_ITEMS_MAP_KEY, JSON.stringify(map || {}));
+};
+
 // Helper function to handle API responses
 const handleResponse = async (response: Response) => {
   if (!response.ok) {
@@ -253,10 +298,6 @@ export const api = {
       });
 
       if (response.ok) {
-        const contentType = response.headers.get('content-type') || '';
-        if (contentType.includes('application/json')) {
-          return handleResponse(response);
-        }
         return { success: true };
       }
 
@@ -291,11 +332,6 @@ export const api = {
         if (!fallbackResponse.ok) {
           return handleResponse(fallbackResponse);
         }
-
-        const fallbackContentType = fallbackResponse.headers.get('content-type') || '';
-        if (fallbackContentType.includes('application/json')) {
-          return handleResponse(fallbackResponse);
-        }
         return { success: true };
       }
 
@@ -306,6 +342,17 @@ export const api = {
       const token = getAuthToken();
       const response = await fetch(`${API_BASE_URL}/items/${id}`, {
         method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      return handleResponse(response);
+    },
+
+    boost: async (id: string, durationDays: number) => {
+      const token = getAuthToken();
+      const response = await fetch(`${API_BASE_URL}/items/${id}/boost?durationDays=${durationDays}`, {
+        method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -357,6 +404,16 @@ export const api = {
 
     getItemBookings: async (itemId: string) => {
       const response = await fetch(`${API_BASE_URL}/bookings/item/${itemId}`);
+      return handleResponse(response);
+    },
+
+    getOwnerBookings: async () => {
+      const token = getAuthToken();
+      const response = await fetch(`${API_BASE_URL}/bookings/owner`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
       return handleResponse(response);
     },
     
@@ -471,6 +528,48 @@ export const api = {
     },
   },
 
+  // Advertisements
+  advertisements: {
+    getAll: async () => {
+      const response = await fetch(`${API_BASE_URL}/advertisements`);
+      return handleResponse(response);
+    },
+
+    create: async (data: {
+      title: string;
+      description?: string;
+      imageUrl: string;
+      linkUrl?: string;
+      position: 'BANNER_TOP' | 'BANNER_BOTTOM' | 'SIDEBAR' | 'CAROUSEL' | 'POPUP';
+      active?: boolean;
+      startDate: string;
+      endDate: string;
+      cost?: number;
+    }) => {
+      const token = getAuthToken();
+      const response = await fetch(`${API_BASE_URL}/advertisements`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(data),
+      });
+      return handleResponse(response);
+    },
+
+    updateStatus: async (id: string, active: boolean) => {
+      const token = getAuthToken();
+      const response = await fetch(`${API_BASE_URL}/advertisements/${id}/status?active=${active}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      return handleResponse(response);
+    },
+  },
+
   // Users
   users: {
     getProfile: async () => {
@@ -499,6 +598,66 @@ export const api = {
         body: JSON.stringify(data),
       });
       return handleResponse(response);
+    },
+
+    getSavedItems: async () => {
+      const token = getAuthToken();
+      try {
+        const response = await fetch(`${API_BASE_URL}/users/me/saved-items`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+        return await handleResponse(response);
+      } catch (error) {
+        const ids = getLocalSavedItemIds();
+        const map = getLocalSavedItemsMap();
+        return ids
+          .map((id) => map[id])
+          .filter(Boolean);
+      }
+    },
+
+    saveItem: async (itemId: string, itemData?: any) => {
+      const token = getAuthToken();
+      try {
+        const response = await fetch(`${API_BASE_URL}/users/me/saved-items/${itemId}`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+        return await handleResponse(response);
+      } catch (error) {
+        const ids = getLocalSavedItemIds();
+        setLocalSavedItemIds([...ids, itemId]);
+        if (itemData) {
+          const map = getLocalSavedItemsMap();
+          map[itemId] = itemData;
+          setLocalSavedItemsMap(map);
+        }
+        return { success: true, local: true };
+      }
+    },
+
+    unsaveItem: async (itemId: string) => {
+      const token = getAuthToken();
+      try {
+        const response = await fetch(`${API_BASE_URL}/users/me/saved-items/${itemId}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+        return await handleResponse(response);
+      } catch (error) {
+        const ids = getLocalSavedItemIds().filter((id) => id !== itemId);
+        setLocalSavedItemIds(ids);
+        const map = getLocalSavedItemsMap();
+        delete map[itemId];
+        setLocalSavedItemsMap(map);
+        return { success: true, local: true };
+      }
     },
   },
 };
