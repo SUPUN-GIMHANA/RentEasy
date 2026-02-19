@@ -132,7 +132,7 @@ export default function AddOffersPage() {
       status: "active",
     }
 
-    saveStoredOffer(newOffer, user?.id)
+    saveStoredOffer(newOffer)
 
     router.push("/admin/items")
   }

@@ -60,7 +60,7 @@ export default function ManageItemsPage() {
 
   useEffect(() => {
     loadItems()
-    setOffers(getStoredOffers(user?.id))
+    setOffers(getStoredOffers())
   }, [user?.id])
 
   const loadItems = async () => {

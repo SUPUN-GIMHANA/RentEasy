@@ -43,7 +43,7 @@ interface Item {
 }
 
 export default function BrowsePage() {
-  const { isAuthenticated, user } = useAuth()
+  const { isAuthenticated } = useAuth()
   const router = useRouter()
   const [items, setItems] = useState<Item[]>([])
   const [loading, setLoading] = useState(true)
@@ -88,8 +88,8 @@ export default function BrowsePage() {
   }, [selectedCategory])
 
   useEffect(() => {
-    setOffers(getStoredOffers(user?.id))
-  }, [user?.id])
+    setOffers(getStoredOffers())
+  }, [])
 
   const loadItems = async () => {
     try {

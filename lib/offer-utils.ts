@@ -10,12 +10,7 @@ export interface StoredOffer {
   status?: string
 }
 
-const getOffersStorageKey = (userId?: string) => {
-  if (userId) {
-    return `offers:${userId}`
-  }
-  return "offers"
-}
+const GLOBAL_OFFERS_KEY = "offers"
 
 const toIsoDay = (date: Date) => {
   const yyyy = date.getFullYear()
@@ -24,26 +19,58 @@ const toIsoDay = (date: Date) => {
   return `${yyyy}-${mm}-${dd}`
 }
 
-export const getStoredOffers = (userId?: string): StoredOffer[] => {
+export const getStoredOffers = (): StoredOffer[] => {
   if (typeof window === "undefined") {
     return []
   }
 
   try {
-    const raw = JSON.parse(localStorage.getItem(getOffersStorageKey(userId)) || "[]")
-    return Array.isArray(raw) ? raw : []
+    const globalRaw = JSON.parse(localStorage.getItem(GLOBAL_OFFERS_KEY) || "[]")
+    const globalOffers = Array.isArray(globalRaw) ? globalRaw : []
+
+    const scopedOffers: StoredOffer[] = []
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const key = localStorage.key(index)
+      if (!key || !key.startsWith("offers:")) {
+        continue
+      }
+
+      try {
+        const parsed = JSON.parse(localStorage.getItem(key) || "[]")
+        if (Array.isArray(parsed)) {
+          scopedOffers.push(...parsed)
+        }
+      } catch {
+      }
+    }
+
+    const merged = [...globalOffers, ...scopedOffers]
+    const dedupedMap = new Map<string, StoredOffer>()
+    for (const offer of merged) {
+      if (!offer?.id) {
+        continue
+      }
+      const existingOffer = dedupedMap.get(offer.id)
+      if (!existingOffer || new Date(offer.createdAt || 0).getTime() > new Date(existingOffer.createdAt || 0).getTime()) {
+        dedupedMap.set(offer.id, offer)
+      }
+    }
+
+    return Array.from(dedupedMap.values()).sort(
+      (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+    )
   } catch {
     return []
   }
 }
 
-export const saveStoredOffer = (offer: StoredOffer, userId?: string) => {
+export const saveStoredOffer = (offer: StoredOffer) => {
   if (typeof window === "undefined") {
     return
   }
 
-  const existingOffers = getStoredOffers(userId)
-  localStorage.setItem(getOffersStorageKey(userId), JSON.stringify([offer, ...existingOffers]))
+  const existingOffers = getStoredOffers().filter((entry) => entry.id !== offer.id)
+  localStorage.setItem(GLOBAL_OFFERS_KEY, JSON.stringify([offer, ...existingOffers]))
 }
 
 export const getActiveOfferForItem = (itemId: string, offers: StoredOffer[], now = new Date()) => {
