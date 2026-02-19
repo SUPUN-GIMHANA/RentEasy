@@ -21,13 +21,23 @@ public class AdvertisementController {
     private final AdvertisementRepository advertisementRepository;
 
     @GetMapping
-    public ResponseEntity<List<Advertisement>> getAllAdvertisements() {
-        return ResponseEntity.ok(advertisementRepository.findAllByOrderByCreatedAtDesc());
+    public ResponseEntity<?> getAllAdvertisements() {
+        try {
+            return ResponseEntity.ok(advertisementRepository.findAllByOrderByCreatedAtDesc());
+        } catch (RuntimeException e) {
+            return ResponseEntity.internalServerError()
+                .body(new ApiResponse(false, "Failed to load advertisements: " + e.getMessage()));
+        }
     }
 
     @GetMapping("/active")
-    public ResponseEntity<List<Advertisement>> getActiveAdvertisements() {
-        return ResponseEntity.ok(advertisementRepository.findAllActiveAds(LocalDateTime.now()));
+    public ResponseEntity<?> getActiveAdvertisements() {
+        try {
+            return ResponseEntity.ok(advertisementRepository.findAllActiveAds(LocalDateTime.now()));
+        } catch (RuntimeException e) {
+            return ResponseEntity.internalServerError()
+                .body(new ApiResponse(false, "Failed to load active advertisements: " + e.getMessage()));
+        }
     }
 
     @PostMapping

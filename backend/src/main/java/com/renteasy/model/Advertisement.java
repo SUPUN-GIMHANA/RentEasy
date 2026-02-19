@@ -35,7 +35,7 @@ public class Advertisement {
     private String linkUrl;
     
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(name = "ad_position")
     private AdPosition position;
     
     @Column(nullable = false)

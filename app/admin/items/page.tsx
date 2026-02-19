@@ -12,6 +12,7 @@ import Link from "next/link"
 import { api } from "@/lib/api-client"
 import { useAuth } from "@/lib/auth-context"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { getActiveOfferForItem, getStoredOffers, type StoredOffer } from "@/lib/offer-utils"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -54,9 +55,12 @@ export default function ManageItemsPage() {
   const [selectedBookingDates, setSelectedBookingDates] = useState<Date[]>([])
   const [isLoadingBookingDates, setIsLoadingBookingDates] = useState(false)
   const [isSavingBookingDates, setIsSavingBookingDates] = useState(false)
+  const [offers, setOffers] = useState<StoredOffer[]>([])
+  const [selectedOffer, setSelectedOffer] = useState<StoredOffer | null>(null)
 
   useEffect(() => {
     loadItems()
+    setOffers(getStoredOffers())
   }, [])
 
   const loadItems = async () => {
@@ -123,6 +127,30 @@ export default function ManageItemsPage() {
         item.category.toLowerCase().includes(searchQuery.toLowerCase())
     )
   }, [items, searchQuery])
+
+  const offerByItemId = useMemo(() => {
+    const nextMap = new Map<string, StoredOffer>()
+    for (const item of filteredItems) {
+      const activeOffer = getActiveOfferForItem(item.id, offers)
+      if (activeOffer) {
+        nextMap.set(item.id, activeOffer)
+      }
+    }
+    return nextMap
+  }, [filteredItems, offers])
+
+  const formatOfferDate = (dateString: string) => {
+    if (!dateString) {
+      return "-"
+    }
+
+    const parsedDate = new Date(dateString)
+    if (Number.isNaN(parsedDate.getTime())) {
+      return dateString
+    }
+
+    return parsedDate.toLocaleDateString()
+  }
 
   const handleDeleteItem = async (itemId: string) => {
     setIsDeleting(true)
@@ -290,7 +318,14 @@ export default function ManageItemsPage() {
                     )}
                   </div>
                   <div className="flex-1">
-                    <h3 className="font-semibold text-lg mb-1">{item.name}</h3>
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="font-semibold text-lg">{item.name}</h3>
+                      {offerByItemId.get(item.id) && (
+                        <button type="button" onClick={() => setSelectedOffer(offerByItemId.get(item.id) || null)}>
+                          <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white">Offer</Badge>
+                        </button>
+                      )}
+                    </div>
                     <div className="flex items-center gap-4 text-sm text-muted-foreground">
                       <span>{item.category}</span>
                       <span>•</span>
@@ -399,6 +434,37 @@ export default function ManageItemsPage() {
               {isSavingBookingDates ? "Saving..." : "Save Blocked Days"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={selectedOffer !== null} onOpenChange={() => setSelectedOffer(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{selectedOffer?.title || "Offer Details"}</DialogTitle>
+            <DialogDescription>Special discount details for this item</DialogDescription>
+          </DialogHeader>
+          {selectedOffer && (
+            <div className="space-y-3 text-sm">
+              <div>
+                <p className="text-muted-foreground">Discount</p>
+                <p className="font-semibold">{selectedOffer.discountPercentage}% OFF</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Description</p>
+                <p>{selectedOffer.description || "No additional description"}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <p className="text-muted-foreground">Valid From</p>
+                  <p>{formatOfferDate(selectedOffer.validFrom)}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Valid To</p>
+                  <p>{formatOfferDate(selectedOffer.validTo)}</p>
+                </div>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

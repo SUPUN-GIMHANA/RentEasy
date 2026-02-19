@@ -14,6 +14,8 @@ import Image from "next/image"
 import Link from "next/link"
 import { useAuth } from "@/lib/auth-context"
 import { useRouter } from "next/navigation"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { getActiveOfferForItem, getStoredOffers, type StoredOffer } from "@/lib/offer-utils"
 
 const categories = ["vehicles", "properties", "electronics", "clothing", "tools", "sports", "camping", "events"]
 
@@ -54,6 +56,8 @@ export default function BrowsePage() {
   const [sortBy, setSortBy] = useState("name")
   const [savedItemIds, setSavedItemIds] = useState<Set<string>>(new Set())
   const [savingItemId, setSavingItemId] = useState<string | null>(null)
+  const [offers, setOffers] = useState<StoredOffer[]>([])
+  const [selectedOffer, setSelectedOffer] = useState<StoredOffer | null>(null)
 
   useEffect(() => {
     loadItems()
@@ -82,6 +86,10 @@ export default function BrowsePage() {
     setSelectedSubcategory("all")
     setPage(0)
   }, [selectedCategory])
+
+  useEffect(() => {
+    setOffers(getStoredOffers())
+  }, [])
 
   const loadItems = async () => {
     try {
@@ -156,6 +164,30 @@ export default function BrowsePage() {
   }, [items, selectedSubcategory, sortBy])
 
   const availableSubcategories = selectedCategory !== "all" ? subcategories[selectedCategory] || [] : []
+
+  const offerByItemId = useMemo(() => {
+    const nextMap = new Map<string, StoredOffer>()
+    for (const item of filteredAndSortedItems) {
+      const activeOffer = getActiveOfferForItem(item.id, offers)
+      if (activeOffer) {
+        nextMap.set(item.id, activeOffer)
+      }
+    }
+    return nextMap
+  }, [filteredAndSortedItems, offers])
+
+  const formatOfferDate = (dateString: string) => {
+    if (!dateString) {
+      return "-"
+    }
+
+    const parsedDate = new Date(dateString)
+    if (Number.isNaN(parsedDate.getTime())) {
+      return dateString
+    }
+
+    return parsedDate.toLocaleDateString()
+  }
 
   const handleToggleSaveItem = async (itemId: string) => {
     if (!isAuthenticated) {
@@ -328,8 +360,20 @@ export default function BrowsePage() {
                             className={`h-4 w-4 ${savedItemIds.has(item.id) ? "fill-red-500 text-red-500" : "text-muted-foreground"}`}
                           />
                         </button>
+                        {offerByItemId.get(item.id) && (
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              setSelectedOffer(offerByItemId.get(item.id) || null)
+                            }}
+                            className="absolute top-2 right-2"
+                          >
+                            <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white">Offer</Badge>
+                          </button>
+                        )}
                         {!item.available && (
-                          <Badge className="absolute top-2 right-2 bg-destructive">Unavailable</Badge>
+                          <Badge className="absolute top-11 right-2 bg-destructive">Unavailable</Badge>
                         )}
                       </div>
                     </CardHeader>
@@ -407,6 +451,37 @@ export default function BrowsePage() {
             </Button>
           </div>
         )}
+
+        <Dialog open={selectedOffer !== null} onOpenChange={() => setSelectedOffer(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{selectedOffer?.title || "Offer Details"}</DialogTitle>
+              <DialogDescription>Special discount details for this item</DialogDescription>
+            </DialogHeader>
+            {selectedOffer && (
+              <div className="space-y-3 text-sm">
+                <div>
+                  <p className="text-muted-foreground">Discount</p>
+                  <p className="font-semibold">{selectedOffer.discountPercentage}% OFF</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Description</p>
+                  <p>{selectedOffer.description || "No additional description"}</p>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <p className="text-muted-foreground">Valid From</p>
+                    <p>{formatOfferDate(selectedOffer.validFrom)}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Valid To</p>
+                    <p>{formatOfferDate(selectedOffer.validTo)}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   )

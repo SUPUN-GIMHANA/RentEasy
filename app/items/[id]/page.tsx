@@ -13,6 +13,8 @@ import { ArrowLeft, CalendarIcon, CheckCircle2, Copy, MessageCircle, Package } f
 import Image from "next/image"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { getActiveOfferForItem, getStoredOffers, type StoredOffer } from "@/lib/offer-utils"
 
 export default function ItemDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
@@ -22,6 +24,8 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
   const [error, setError] = useState("")
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined)
   const [copiedNumber, setCopiedNumber] = useState(false)
+  const [offer, setOffer] = useState<StoredOffer | null>(null)
+  const [offerDialogOpen, setOfferDialogOpen] = useState(false)
   const { isAuthenticated } = useAuth()
   const router = useRouter()
 
@@ -55,6 +59,7 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
         if (isMounted) {
           setItem(data)
           setBookedDateSet(nextBookedDates)
+          setOffer(getActiveOfferForItem(data.id, getStoredOffers()) || null)
         }
       } catch (err) {
         if (isMounted) {
@@ -150,6 +155,19 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
     }, 500)
   }
 
+  const formatOfferDate = (dateString: string) => {
+    if (!dateString) {
+      return "-"
+    }
+
+    const parsedDate = new Date(dateString)
+    if (Number.isNaN(parsedDate.getTime())) {
+      return dateString
+    }
+
+    return parsedDate.toLocaleDateString()
+  }
+
   const blockedDateSet = new Set(item.availableDates || [])
 
   return (
@@ -175,9 +193,16 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
           {/* Details Section */}
           <div>
             <div className="mb-4">
-              <Badge variant="secondary" className="mb-2">
-                {item.category}
-              </Badge>
+              <div className="mb-2 flex items-center gap-2 flex-wrap">
+                <Badge variant="secondary">
+                  {item.category}
+                </Badge>
+                {offer && (
+                  <button type="button" onClick={() => setOfferDialogOpen(true)}>
+                    <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white">Offer</Badge>
+                  </button>
+                )}
+              </div>
               <h1 className="text-4xl font-bold mb-2">{item.name}</h1>
               <div className="flex items-baseline gap-2">
                 <span className="text-4xl font-bold text-[#2B70FF]">${item.price}</span>
@@ -304,6 +329,39 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
           </div>
         </div>
       </div>
+
+      <Dialog open={offerDialogOpen} onOpenChange={setOfferDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{offer?.title || "Offer Details"}</DialogTitle>
+            <DialogDescription>
+              Special discount details for this item
+            </DialogDescription>
+          </DialogHeader>
+          {offer && (
+            <div className="space-y-3 text-sm">
+              <div>
+                <p className="text-muted-foreground">Discount</p>
+                <p className="font-semibold">{offer.discountPercentage}% OFF</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Description</p>
+                <p>{offer.description || "No additional description"}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <p className="text-muted-foreground">Valid From</p>
+                  <p>{formatOfferDate(offer.validFrom)}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Valid To</p>
+                  <p>{formatOfferDate(offer.validTo)}</p>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

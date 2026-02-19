@@ -11,9 +11,21 @@ import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
+import { api } from "@/lib/api-client"
+import { useAuth } from "@/lib/auth-context"
+
+interface OfferItem {
+  id: string
+  name: string
+  category: string
+  price: number
+  imageUrl?: string
+  ownerId?: string
+}
 
 export default function AddOffersPage() {
   const router = useRouter()
+  const { user } = useAuth()
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -21,15 +33,60 @@ export default function AddOffersPage() {
     validFrom: "",
     validTo: "",
   })
-  const [allItems, setAllItems] = useState<any[]>([])
+  const [allItems, setAllItems] = useState<OfferItem[]>([])
   const [selectedItems, setSelectedItems] = useState<string[]>([])
+  const [loadingItems, setLoadingItems] = useState(true)
+  const [itemsError, setItemsError] = useState("")
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const items = JSON.parse(localStorage.getItem("rentalItems") || "[]")
-      setAllItems(items)
+    loadApplicableItems()
+  }, [user?.id])
+
+  const normalizeItems = (rawItems: any[]): OfferItem[] => {
+    return (rawItems || []).map((item) => ({
+      id: item.id,
+      name: item.name,
+      category: item.category,
+      price: Number(item.price || 0),
+      imageUrl: item.imageUrl || item.image,
+      ownerId: item.ownerId,
+    }))
+  }
+
+  const loadApplicableItems = async () => {
+    try {
+      setLoadingItems(true)
+      setItemsError("")
+
+      const myItemsResponse = await api.items.getMyItems().catch(() => [])
+      let normalizedItems = normalizeItems(myItemsResponse || [])
+
+      if (normalizedItems.length === 0) {
+        const allItemsResponse = await api.items.getAll(0, 200).catch(() => ({ content: [] }))
+        const allItemsData = normalizeItems(allItemsResponse?.content || allItemsResponse || [])
+
+        if (user?.id) {
+          normalizedItems = allItemsData.filter((item) => item.ownerId === user.id)
+        }
+
+        if (normalizedItems.length === 0 && typeof window !== "undefined") {
+          const createdIds: string[] = JSON.parse(localStorage.getItem("myCreatedItemIds") || "[]")
+          if (createdIds.length > 0) {
+            const createdIdSet = new Set(createdIds)
+            normalizedItems = allItemsData.filter((item) => createdIdSet.has(item.id))
+          }
+        }
+      }
+
+      setAllItems(normalizedItems)
+    } catch (error) {
+      console.error("Failed to load applicable items:", error)
+      setAllItems([])
+      setItemsError("Failed to load your items")
+    } finally {
+      setLoadingItems(false)
     }
-  }, [])
+  }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
@@ -68,7 +125,7 @@ export default function AddOffersPage() {
       discountPercentage: parseInt(formData.discountPercentage),
       validFrom: formData.validFrom,
       validTo: formData.validTo,
-      applicableItems: selectedItems,
+      applicableItems: selectedItems.map(String),
       createdAt: new Date().toISOString(),
       status: "active",
     }
@@ -78,7 +135,7 @@ export default function AddOffersPage() {
       localStorage.setItem("offers", JSON.stringify([newOffer, ...existingOffers]))
     }
 
-    router.push("/admin/commercial")
+    router.push("/admin/items")
   }
 
   return (
@@ -169,14 +226,26 @@ export default function AddOffersPage() {
               variant="outline"
               size="sm"
               onClick={handleSelectAll}
+              disabled={allItems.length === 0}
             >
-              {selectedItems.length === allItems.length ? "Deselect All" : "Select All"}
+              {allItems.length > 0 && selectedItems.length === allItems.length ? "Deselect All" : "Select All"}
             </Button>
           </CardHeader>
           <CardContent>
-            {allItems.length === 0 ? (
+            {loadingItems ? (
               <div className="text-center py-8">
-                <p className="text-muted-foreground mb-4">No items available. Create items first in Manage Items.</p>
+                <p className="text-muted-foreground">Loading your items...</p>
+              </div>
+            ) : itemsError ? (
+              <div className="text-center py-8 space-y-4">
+                <p className="text-muted-foreground">{itemsError}</p>
+                <Button type="button" variant="outline" onClick={loadApplicableItems}>
+                  Retry
+                </Button>
+              </div>
+            ) : allItems.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground mb-4">No items found for this account. Add items first in Manage Items.</p>
               </div>
             ) : (
               <div className="grid gap-4">
@@ -187,9 +256,9 @@ export default function AddOffersPage() {
                       checked={selectedItems.includes(item.id)}
                       onCheckedChange={() => handleItemToggle(item.id)}
                     />
-                    <div className="relative h-16 w-16 rounded-lg overflow-hidden flex-shrink-0">
+                    <div className="relative h-16 w-16 rounded-lg overflow-hidden shrink-0">
                       <Image
-                        src={item.image || "/placeholder.svg"}
+                        src={item.imageUrl || "/placeholder.svg"}
                         alt={item.name}
                         fill
                         className="object-cover"
