@@ -38,7 +38,9 @@ export default function SavesPage() {
     const loadSavedItems = async () => {
       try {
         setLoading(true)
+        console.log("Loading saved items...")
         const response = await api.users.getSavedItems()
+        console.log("Saved items response:", response)
         setSavedItems(response || [])
       } catch (error) {
         console.error("Failed to load saved items:", error)

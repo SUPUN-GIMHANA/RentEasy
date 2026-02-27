@@ -24,7 +24,7 @@ export function Header() {
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-[#2B70FF] to-[#1A4FCC] transition-transform duration-300 group-hover:scale-110">
               <Package className="h-6 w-6 text-white" />
             </div>
-            <span className="text-xl font-bold text-foreground">RentHub</span>
+            <span className="text-xl font-bold text-foreground">RentEasy</span>
           </Link>
           <LocationSelector />
         </div>

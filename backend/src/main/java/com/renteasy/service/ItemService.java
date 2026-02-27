@@ -15,13 +15,17 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
 public class ItemService {
+
+    private static final int MAX_ITEM_IMAGES = 5;
     
     private final ItemRepository itemRepository;
     private final UserRepository userRepository;
@@ -29,6 +33,7 @@ public class ItemService {
     @Transactional
     public Item createItem(ItemRequest request, String userId) {
         User owner = resolveOwner(userId);
+        PreparedImages preparedImages = prepareImages(request.getImageUrl(), request.getAdditionalImages());
         
         Item item = new Item();
         item.setName(request.getName());
@@ -36,8 +41,8 @@ public class ItemService {
         item.setCategory(request.getCategory() != null ? request.getCategory().trim() : null);
         item.setSubcategory(request.getSubcategory() != null ? request.getSubcategory().trim() : null);
         item.setPrice(request.getPrice());
-        item.setImageUrl(request.getImageUrl());
-        item.setAdditionalImages(request.getAdditionalImages());
+        item.setImageUrl(preparedImages.mainImageUrl());
+        item.setAdditionalImages(preparedImages.additionalImageUrls());
         item.setAvailable(request.getAvailable());
         item.setAvailableDates(request.getAvailableDates());
         item.setLocation(request.getLocation());
@@ -85,6 +90,8 @@ public class ItemService {
     public Item updateItem(String itemId, ItemRequest request, String userId) {
         Item item = itemRepository.findById(itemId)
             .orElseThrow(() -> new RuntimeException("Item not found"));
+
+        PreparedImages preparedImages = prepareImages(request.getImageUrl(), request.getAdditionalImages());
         
         if (!item.getOwner().getId().equals(userId)) {
             throw new RuntimeException("You don't have permission to update this item");
@@ -95,8 +102,8 @@ public class ItemService {
         item.setCategory(request.getCategory() != null ? request.getCategory().trim() : null);
         item.setSubcategory(request.getSubcategory() != null ? request.getSubcategory().trim() : null);
         item.setPrice(request.getPrice());
-        item.setImageUrl(request.getImageUrl());
-        item.setAdditionalImages(request.getAdditionalImages());
+        item.setImageUrl(preparedImages.mainImageUrl());
+        item.setAdditionalImages(preparedImages.additionalImageUrls());
         item.setAvailable(request.getAvailable());
         item.setAvailableDates(request.getAvailableDates());
         item.setLocation(request.getLocation());
@@ -209,4 +216,46 @@ public class ItemService {
         
         itemRepository.delete(item);
     }
+
+    private PreparedImages prepareImages(String imageUrl, List<String> additionalImages) {
+        List<String> normalizedImages = new ArrayList<>();
+
+        String normalizedMainImage = normalizeImageUrl(imageUrl);
+        if (normalizedMainImage != null) {
+            normalizedImages.add(normalizedMainImage);
+        }
+
+        if (additionalImages != null) {
+            for (String additionalImage : additionalImages) {
+                String normalizedAdditionalImage = normalizeImageUrl(additionalImage);
+                if (normalizedAdditionalImage != null) {
+                    normalizedImages.add(normalizedAdditionalImage);
+                }
+            }
+        }
+
+        List<String> distinctImages = new ArrayList<>(new LinkedHashSet<>(normalizedImages));
+        if (distinctImages.size() > MAX_ITEM_IMAGES) {
+            throw new RuntimeException("Maximum 5 images are allowed per item");
+        }
+
+        if (distinctImages.isEmpty()) {
+            return new PreparedImages(null, new ArrayList<>());
+        }
+
+        String mainImage = distinctImages.get(0);
+        List<String> additional = new ArrayList<>(distinctImages.subList(1, distinctImages.size()));
+        return new PreparedImages(mainImage, additional);
+    }
+
+    private String normalizeImageUrl(String imageUrl) {
+        if (imageUrl == null) {
+            return null;
+        }
+
+        String trimmed = imageUrl.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private record PreparedImages(String mainImageUrl, List<String> additionalImageUrls) {}
 }

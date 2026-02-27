@@ -19,10 +19,11 @@ import { getActiveOfferForItem, getStoredOffers, type StoredOffer } from "@/lib/
 export default function ItemDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const [item, setItem] = useState<Item | null>(null)
+  const [selectedImage, setSelectedImage] = useState<string>("/placeholder.svg")
   const [bookedDateSet, setBookedDateSet] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined)
+  const [dateRange, setDateRange] = useState<{ from: Date | undefined; to?: Date | undefined }>({ from: undefined, to: undefined })
   const [copiedNumber, setCopiedNumber] = useState(false)
   const [offer, setOffer] = useState<StoredOffer | null>(null)
   const [offerDialogOpen, setOfferDialogOpen] = useState(false)
@@ -58,6 +59,8 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
 
         if (isMounted) {
           setItem(data)
+          const images = Array.from(new Set([data.imageUrl, ...(data.additionalImages || [])].filter(Boolean))).slice(0, 5)
+          setSelectedImage(images[0] || "/placeholder.svg")
           setBookedDateSet(nextBookedDates)
           setOffer(getActiveOfferForItem(data.id, getStoredOffers()) || null)
         }
@@ -112,8 +115,10 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
       router.push(`/login?redirect=/items/${item.id}`)
       return
     }
-    if (selectedDate) {
-      router.push(`/booking?itemId=${item.id}&date=${selectedDate.toISOString()}`)
+    if (dateRange.from) {
+      const startDate = dateRange.from.toISOString()
+      const endDate = dateRange.to ? dateRange.to.toISOString() : dateRange.from.toISOString()
+      router.push(`/booking?itemId=${item.id}&startDate=${startDate}&endDate=${endDate}`)
     }
   }
 
@@ -169,6 +174,7 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
   }
 
   const blockedDateSet = new Set(item.availableDates || [])
+  const itemImages = Array.from(new Set([item.imageUrl, ...(item.additionalImages || [])].filter(Boolean))).slice(0, 5)
 
   return (
     <div className="min-h-screen bg-background">
@@ -186,8 +192,22 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
           {/* Image Section */}
           <div>
             <div className="relative aspect-square rounded-lg overflow-hidden bg-muted">
-              <Image src={item.imageUrl || "/placeholder.svg"} alt={item.name} fill className="object-cover" />
+              <Image src={selectedImage || "/placeholder.svg"} alt={item.name} fill className="object-cover" />
             </div>
+            {itemImages.length > 1 && (
+              <div className="grid grid-cols-5 gap-2 mt-3">
+                {itemImages.map((image, index) => (
+                  <button
+                    key={`${image}-${index}`}
+                    type="button"
+                    onClick={() => setSelectedImage(image)}
+                    className={`relative aspect-square rounded-md overflow-hidden border-2 transition-colors ${selectedImage === image ? "border-primary" : "border-transparent"}`}
+                  >
+                    <Image src={image || "/placeholder.svg"} alt={`${item.name} photo ${index + 1}`} fill className="object-cover" />
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Details Section */}
@@ -241,14 +261,14 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
                 <CardHeader>
                   <h3 className="text-lg font-semibold flex items-center gap-2">
                     <CalendarIcon className="h-5 w-5" />
-                    Select a Date
+                    Select Rental Period
                   </h3>
                 </CardHeader>
                 <CardContent>
                   <Calendar
-                    mode="single"
-                    selected={selectedDate}
-                    onSelect={setSelectedDate}
+                    mode="range"
+                    selected={dateRange}
+                    onSelect={(range) => setDateRange(range || { from: undefined, to: undefined })}
                     modifiers={{
                       blockedByOwner: (date) => {
                         const yyyy = date.getFullYear()
@@ -288,7 +308,7 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
                   <p className="text-sm text-muted-foreground mt-4">
                     {`${blockedDateSet.size} dates blocked by owner • ${bookedDateSet.size} dates already booked`}
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1">Red circles are blocked dates and cannot be booked.</p>
+                  <p className="text-xs text-muted-foreground mt-1">Red circles are blocked dates and cannot be booked. Select a date range for your rental period.</p>
                 </CardContent>
               </Card>
             )}
@@ -299,7 +319,7 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
                 <Button
                   size="lg"
                   className="w-full bg-[#FF8C00] hover:bg-[#CC7000] text-white"
-                  disabled={!selectedDate}
+                  disabled={!dateRange.from}
                   onClick={handleBooking}
                 >
                   {isAuthenticated ? "Proceed to Booking" : "Login to Book"}

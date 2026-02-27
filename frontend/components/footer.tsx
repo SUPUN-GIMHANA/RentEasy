@@ -9,9 +9,9 @@ export function Footer() {
     <footer className="bg-[#0D3B8E] text-white">
       <div className="container mx-auto px-4 py-12">
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-10 mb-8">
-          {/* More from RentHub */}
+          {/* More from RentEasy */}
           <div>
-            <h3 className="font-semibold text-base mb-4">More from RentHub</h3>
+            <h3 className="font-semibold text-base mb-4">More from RentEasy</h3>
             <ul className="space-y-2 text-sm">
               <li>
                 <Link href="/browse" className="hover:text-[#0EA5E9] transition-colors duration-200">
@@ -58,9 +58,9 @@ export function Footer() {
             </ul>
           </div>
 
-          {/* About RentHub */}
+          {/* About RentEasy */}
           <div>
-            <h3 className="font-semibold text-base mb-4">About RentHub</h3>
+            <h3 className="font-semibold text-base mb-4">About RentEasy</h3>
             <ul className="space-y-2 text-sm">
               <li>
                 <Link href="/about" className="hover:text-[#0EA5E9] transition-colors duration-200">
@@ -144,9 +144,9 @@ export function Footer() {
           <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-sm">
             <div className="flex items-center gap-2">
               <Package className="h-5 w-5" />
-              <span className="font-bold">RentHub</span>
+              <span className="font-bold">RentEasy</span>
             </div>
-            <p className="text-white/80">© 2026 RentHub Technologies. All rights reserved.</p>
+            <p className="text-white/80">© 2026 VERDIX Technologies. All rights reserved.</p>
           </div>
         </div>
       </div>

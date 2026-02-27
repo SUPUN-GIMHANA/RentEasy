@@ -244,6 +244,7 @@ export const api = {
     create: async (data: any) => {
       const token = getAuthToken();
       const formData = new FormData();
+      const maxItemImages = 5;
       
       // Add text fields
       formData.append('name', data.name);
@@ -273,7 +274,7 @@ export const api = {
       
       // Add image files
       if (data.imageFiles && data.imageFiles.length > 0) {
-        data.imageFiles.forEach((file: File, index: number) => {
+        data.imageFiles.slice(0, maxItemImages).forEach((file: File, index: number) => {
           if (index === 0) {
             formData.append('imageFile', file);
           } else {
@@ -628,13 +629,35 @@ export const api = {
             'Authorization': `Bearer ${token}`,
           },
         });
-        return await handleResponse(response);
+        const data = await handleResponse(response);
+        console.log("API saved items response:", data);
+        return data;
       } catch (error) {
+        // If API fails, fetch items individually using stored IDs
+        console.warn('Failed to fetch saved items from API, fetching by IDs:', error);
         const ids = getLocalSavedItemIds();
-        const map = getLocalSavedItemsMap();
-        return ids
-          .map((id) => map[id])
-          .filter(Boolean);
+        console.log("Local saved item IDs:", ids);
+        if (ids.length === 0) {
+          console.log("No saved item IDs found in localStorage");
+          return [];
+        }
+        
+        // Fetch each item individually
+        const itemPromises = ids.map(async (id) => {
+          try {
+            console.log(`Fetching item ${id}...`);
+            const response = await fetch(`${API_BASE_URL}/items/${id}`);
+            return await handleResponse(response);
+          } catch (err) {
+            console.warn(`Failed to fetch item ${id}:`, err);
+            return null;
+          }
+        });
+        
+        const items = await Promise.all(itemPromises);
+        const validItems = items.filter(Boolean);
+        console.log("Fetched items from IDs:", validItems);
+        return validItems;
       }
     },
 
@@ -647,14 +670,18 @@ export const api = {
             'Authorization': `Bearer ${token}`,
           },
         });
-        return await handleResponse(response);
+        const data = await handleResponse(response);
+        console.log("Item saved via API:", itemId);
+        return data;
       } catch (error) {
+        // Only store item ID, not full item data to prevent localStorage quota errors
+        console.log("API save failed, storing ID locally:", itemId);
         const ids = getLocalSavedItemIds();
-        setLocalSavedItemIds([...ids, itemId]);
-        if (itemData) {
-          const map = getLocalSavedItemsMap();
-          map[itemId] = itemData;
-          setLocalSavedItemsMap(map);
+        console.log("Current saved IDs:", ids);
+        if (!ids.includes(itemId)) {
+          const newIds = [...ids, itemId];
+          setLocalSavedItemIds(newIds);
+          console.log("Updated saved IDs:", newIds);
         }
         return { success: true, local: true };
       }
@@ -669,13 +696,15 @@ export const api = {
             'Authorization': `Bearer ${token}`,
           },
         });
-        return await handleResponse(response);
+        const data = await handleResponse(response);
+        console.log("Item unsaved via API:", itemId);
+        return data;
       } catch (error) {
+        // Only remove item ID from localStorage
+        console.log("API unsave failed, removing ID locally:", itemId);
         const ids = getLocalSavedItemIds().filter((id) => id !== itemId);
         setLocalSavedItemIds(ids);
-        const map = getLocalSavedItemsMap();
-        delete map[itemId];
-        setLocalSavedItemsMap(map);
+        console.log("Updated saved IDs after removal:", ids);
         return { success: true, local: true };
       }
     },

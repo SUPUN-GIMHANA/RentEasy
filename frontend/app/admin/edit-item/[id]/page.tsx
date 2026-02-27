@@ -13,6 +13,7 @@ import { Upload, X } from "lucide-react"
 import Image from "next/image"
 import { useRouter, useParams } from "next/navigation"
 import { api } from "@/lib/api-client"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
 const SUBCATEGORIES: Record<string, string[]> = {
   vehicles: ["Cars", "Motorbikes", "Bicycles", "Trucks/Lorries"],
@@ -24,6 +25,8 @@ const SUBCATEGORIES: Record<string, string[]> = {
   camping: ["Camping items", "Tour Guiders"],
   events: ["Electric items", "Event items"],
 }
+
+const MAX_ITEM_IMAGES = 5
 
 export default function EditItemPage() {
   const router = useRouter()
@@ -43,7 +46,10 @@ export default function EditItemPage() {
   const [uploadedImages, setUploadedImages] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
+  const [showImageLimitDialog, setShowImageLimitDialog] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const imageLimitMessage = "You can upload only 5 images. If you want to add more images, first pay for package."
 
   useEffect(() => {
     const loadItem = async () => {
@@ -69,7 +75,9 @@ export default function EditItemPage() {
           availableFrom: "",
           availableTo: "",
         })
-        setUploadedImages(item.additionalImages?.length ? item.additionalImages : [item.imageUrl].filter(Boolean))
+        const combinedImages = [item.imageUrl, ...(item.additionalImages || [])].filter(Boolean)
+        const distinctImages = Array.from(new Set(combinedImages)).slice(0, MAX_ITEM_IMAGES)
+        setUploadedImages(distinctImages)
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load item")
       } finally {
@@ -106,7 +114,23 @@ export default function EditItemPage() {
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
     if (files) {
-      Array.from(files).forEach((file) => {
+      const remainingSlots = MAX_ITEM_IMAGES - uploadedImages.length
+      if (remainingSlots <= 0) {
+        setError(imageLimitMessage)
+        setShowImageLimitDialog(true)
+        e.target.value = ""
+        return
+      }
+
+      const selectedFiles = Array.from(files).slice(0, remainingSlots)
+      if (files.length > remainingSlots) {
+        setError(imageLimitMessage)
+        setShowImageLimitDialog(true)
+      } else {
+        setError("")
+      }
+
+      selectedFiles.forEach((file) => {
         const reader = new FileReader()
         reader.onload = (event) => {
           if (event.target?.result) {
@@ -115,6 +139,7 @@ export default function EditItemPage() {
         }
         reader.readAsDataURL(file)
       })
+      e.target.value = ""
     }
   }
 
@@ -125,6 +150,16 @@ export default function EditItemPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
+    if (uploadedImages.length === 0) {
+      setError("Please upload at least one image")
+      return
+    }
+
+    if (uploadedImages.length > MAX_ITEM_IMAGES) {
+      setError("Maximum 5 images are allowed per item")
+      return
+    }
+
     const updatedItem = {
       name: formData.name,
       category: formData.category,
@@ -134,7 +169,7 @@ export default function EditItemPage() {
       description: formData.description,
       available: true,
       imageUrl: uploadedImages[0] || "/placeholder.svg",
-      additionalImages: uploadedImages,
+      additionalImages: uploadedImages.slice(1),
     }
 
     try {
@@ -153,6 +188,30 @@ export default function EditItemPage() {
 
   return (
     <div className="space-y-6 max-w-4xl" suppressHydrationWarning>
+      <Dialog open={showImageLimitDialog} onOpenChange={setShowImageLimitDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Image Limit Reached</DialogTitle>
+            <DialogDescription>{imageLimitMessage}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setShowImageLimitDialog(false)}>
+              Close
+            </Button>
+            <Button
+              type="button"
+              className="bg-[#2B70FF] hover:bg-[#1A4FCC]"
+              onClick={() => {
+                setShowImageLimitDialog(false)
+                router.push("/admin/boost")
+              }}
+            >
+              Pay
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <div>
         <h1 className="text-3xl font-bold mb-2">Edit Item</h1>
         <p className="text-muted-foreground">Update rental item details and images</p>
@@ -260,6 +319,7 @@ export default function EditItemPage() {
 
             <div className="space-y-2">
               <Label>Upload Images *</Label>
+              <p className="text-xs text-muted-foreground">Up to 5 images per item</p>
               <div
                 className="border-2 border-dashed rounded-lg p-8 text-center hover:bg-muted/50 transition-colors cursor-pointer"
                 onClick={() => fileInputRef.current?.click()}
@@ -295,6 +355,7 @@ export default function EditItemPage() {
                   ))}
                 </div>
               )}
+              <p className="text-sm text-muted-foreground">{uploadedImages.length}/{MAX_ITEM_IMAGES} images selected</p>
             </div>
           </CardContent>
         </Card>

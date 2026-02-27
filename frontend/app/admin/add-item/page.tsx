@@ -16,6 +16,7 @@ import { api } from "@/lib/api-client"
 import { useAuth } from "@/lib/auth-context"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Calendar } from "@/components/ui/calendar"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
 const SUBCATEGORIES: Record<string, string[]> = {
   vehicles: ["Cars", "Motorbikes", "Bicycles", "Trucks/Lorries"],
@@ -27,6 +28,8 @@ const SUBCATEGORIES: Record<string, string[]> = {
   camping: ["Camping items", "Tour Guiders"],
   events: ["Electric items", "Event items"],
 }
+
+const MAX_ITEM_IMAGES = 5
 
 export default function AddItemPage() {
   const router = useRouter()
@@ -47,7 +50,10 @@ export default function AddItemPage() {
   const [availableDates, setAvailableDates] = useState<Date[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
+  const [showImageLimitDialog, setShowImageLimitDialog] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const imageLimitMessage = "You can upload only 5 images. If you want to add more images, first pay for package."
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
@@ -75,7 +81,23 @@ export default function AddItemPage() {
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
     if (files) {
-      const newFiles = Array.from(files)
+      const remainingSlots = MAX_ITEM_IMAGES - uploadedImages.length
+      if (remainingSlots <= 0) {
+        setError(imageLimitMessage)
+        setShowImageLimitDialog(true)
+        e.target.value = ""
+        return
+      }
+
+      const selectedFiles = Array.from(files)
+      const newFiles = selectedFiles.slice(0, remainingSlots)
+      if (selectedFiles.length > remainingSlots) {
+        setError(imageLimitMessage)
+        setShowImageLimitDialog(true)
+      } else {
+        setError("")
+      }
+
       const newPreviews: string[] = []
       
       newFiles.forEach((file) => {
@@ -94,6 +116,7 @@ export default function AddItemPage() {
       
       // Store actual File objects
       setUploadedImages((prev) => [...prev, ...newFiles])
+      e.target.value = ""
     }
   }
 
@@ -127,6 +150,12 @@ export default function AddItemPage() {
 
       if (uploadedImages.length === 0) {
         setError("Please upload at least one image")
+        setIsLoading(false)
+        return
+      }
+
+      if (uploadedImages.length > MAX_ITEM_IMAGES) {
+        setError("Maximum 5 images are allowed per item")
         setIsLoading(false)
         return
       }
@@ -177,6 +206,30 @@ export default function AddItemPage() {
 
   return (
     <div className="space-y-6 max-w-4xl" suppressHydrationWarning>
+      <Dialog open={showImageLimitDialog} onOpenChange={setShowImageLimitDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Image Limit Reached</DialogTitle>
+            <DialogDescription>{imageLimitMessage}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setShowImageLimitDialog(false)}>
+              Close
+            </Button>
+            <Button
+              type="button"
+              className="bg-[#2B70FF] hover:bg-[#1A4FCC]"
+              onClick={() => {
+                setShowImageLimitDialog(false)
+                router.push("/admin/boost")
+              }}
+            >
+              Pay
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <div>
         <h1 className="text-3xl font-bold mb-2">Add New Item</h1>
         <p className="text-muted-foreground">Create a new rental listing with images and details</p>
@@ -296,6 +349,7 @@ export default function AddItemPage() {
 
             <div className="space-y-2">
               <Label>Upload Images *</Label>
+              <p className="text-xs text-muted-foreground">Up to 5 images per item</p>
               
               {/* Hidden file input */}
               <input
@@ -336,6 +390,7 @@ export default function AddItemPage() {
                   ))}
                 </div>
               )}
+              <p className="text-sm text-muted-foreground">{uploadedImages.length}/{MAX_ITEM_IMAGES} images selected</p>
             </div>
           </CardContent>
         </Card>

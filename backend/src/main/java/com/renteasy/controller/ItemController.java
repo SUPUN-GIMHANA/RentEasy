@@ -28,6 +28,8 @@ import java.util.stream.Collectors;
 @RequestMapping("/api/items")
 @RequiredArgsConstructor
 public class ItemController {
+
+    private static final int MAX_ITEM_IMAGES = 5;
     
     private final ItemService itemService;
     
@@ -86,6 +88,13 @@ public class ItemController {
             }
             
             if (additionalImageFiles != null && additionalImageFiles.length > 0) {
+                int mainImageCount = (imageFile != null && !imageFile.isEmpty()) ? 1 : 0;
+                int totalImages = mainImageCount + additionalImageFiles.length;
+                if (totalImages > MAX_ITEM_IMAGES) {
+                    return ResponseEntity.badRequest()
+                        .body(new ApiResponse(false, "Maximum 5 images are allowed per item"));
+                }
+
                 for (MultipartFile file : additionalImageFiles) {
                     if (!file.isEmpty()) {
                         String base64Image = "data:" + file.getContentType() + ";base64," + 

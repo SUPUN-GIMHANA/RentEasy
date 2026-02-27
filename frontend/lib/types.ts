@@ -3,10 +3,15 @@ export interface Item {
   name: string
   description: string
   category: string
+  subcategory?: string
   price: number
   imageUrl: string
+  additionalImages?: string[]
   available: boolean
   availableDates: string[]
+  location?: string
+  minimumRentalPeriod?: number
+  maximumRentalPeriod?: number
   ownerPhoneNumber?: string
 }
 

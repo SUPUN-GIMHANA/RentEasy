@@ -197,9 +197,11 @@ export default function BrowsePage() {
 
     setSavingItemId(itemId)
     const isSaved = savedItemIds.has(itemId)
+    console.log(`Toggling save for item ${itemId}, currently saved:`, isSaved)
 
     try {
       if (isSaved) {
+        console.log(`Unsaving item ${itemId}`)
         await api.users.unsaveItem(itemId)
         setSavedItemIds((prev) => {
           const next = new Set(prev)
@@ -207,10 +209,11 @@ export default function BrowsePage() {
           return next
         })
       } else {
-        const itemData = items.find((entry) => entry.id === itemId)
-        await api.users.saveItem(itemId, itemData)
+        console.log(`Saving item ${itemId}`)
+        await api.users.saveItem(itemId)
         setSavedItemIds((prev) => new Set([...prev, itemId]))
       }
+      console.log(`Successfully toggled save for item ${itemId}`)
     } catch (error) {
       console.error("Failed to update saved item:", error)
     } finally {
