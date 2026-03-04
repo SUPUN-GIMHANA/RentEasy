@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import type { Booking } from "@/lib/types"
 import { useAuth } from "@/lib/auth-context"
+import { safeJsonParse } from "@/lib/utils"
 import { CalendarIcon, Package, MessageSquare } from "lucide-react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
@@ -22,7 +23,7 @@ export default function OrdersPage() {
       return
     }
 
-    const storedBookings = JSON.parse(localStorage.getItem("bookings") || "[]")
+    const storedBookings = safeJsonParse<Booking[]>(localStorage.getItem("bookings"), [])
     const userBookings = storedBookings.filter((booking: Booking) => booking.userId === user?.id)
     setBookings(userBookings)
   }, [isAuthenticated, user, router])

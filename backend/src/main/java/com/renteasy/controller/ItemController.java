@@ -127,7 +127,7 @@ public class ItemController {
             
             Item item = itemService.createItem(request, userId);
             return ResponseEntity.status(HttpStatus.CREATED)
-                .body(new ApiResponse(true, "Item created successfully", item));
+                .body(new ApiResponse(true, "Item created successfully", convertToDTO(item)));
         } catch (IOException e) {
             return ResponseEntity.badRequest()
                 .body(new ApiResponse(false, "Error processing image files: " + e.getMessage()));
@@ -144,7 +144,7 @@ public class ItemController {
             String userId = getUserIdFromAuthentication(authentication);
             Item item = itemService.createItem(request, userId);
             return ResponseEntity.status(HttpStatus.CREATED)
-                .body(new ApiResponse(true, "Item created successfully", item));
+                .body(new ApiResponse(true, "Item created successfully", convertToDTO(item)));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest()
                 .body(new ApiResponse(false, e.getMessage()));
@@ -158,7 +158,7 @@ public class ItemController {
         try {
             String userId = getUserIdFromAuthentication(authentication);
             Item item = itemService.updateItem(id, request, userId);
-            return ResponseEntity.ok(new ApiResponse(true, "Item updated successfully", item));
+            return ResponseEntity.ok(new ApiResponse(true, "Item updated successfully", convertToDTO(item)));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest()
                 .body(new ApiResponse(false, e.getMessage()));

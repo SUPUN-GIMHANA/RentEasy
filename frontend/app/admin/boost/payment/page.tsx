@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label"
 import { useRouter, useSearchParams } from "next/navigation"
 import { api } from "@/lib/api-client"
 import { useAuth } from "@/lib/auth-context"
+import { safeJsonParse } from "@/lib/utils"
 
 export default function PaymentPage() {
   const router = useRouter()
@@ -90,7 +91,7 @@ export default function PaymentPage() {
 
       if (typeof window !== "undefined") {
         const boostedItemsKey = user?.id ? `boostedItems:${user.id}` : "boostedItems"
-        const activeBoosts = JSON.parse(localStorage.getItem(boostedItemsKey) || "[]")
+        const activeBoosts = safeJsonParse<any[]>(localStorage.getItem(boostedItemsKey), [])
         localStorage.setItem(boostedItemsKey, JSON.stringify([...activeBoosts, newBoost]))
       }
     }

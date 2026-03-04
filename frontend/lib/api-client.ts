@@ -130,11 +130,26 @@ const handleResponse = async (response: Response) => {
   
   const contentType = response.headers.get('content-type');
   if (contentType && contentType.includes('application/json')) {
+    const responseClone = response.clone();
     try {
       return await response.json();
     } catch (e) {
-      console.error('Failed to parse JSON response:', e);
-      throw new Error(`Invalid JSON response from server: ${e instanceof Error ? e.message : 'Unknown error'}`);
+      const isFetchFailure = e instanceof TypeError && e.message.toLowerCase().includes('failed to fetch');
+      if (isFetchFailure) {
+        throw new ApiError(0, 'Unable to connect to server. Please ensure the backend is running.');
+      }
+
+      const fallbackText = await responseClone.text().catch(() => '');
+      if (!fallbackText || !fallbackText.trim()) {
+        return {};
+      }
+
+      try {
+        return JSON.parse(fallbackText);
+      } catch {
+        console.error('Failed to parse JSON response:', e);
+        throw new ApiError(0, 'Server returned malformed JSON response.');
+      }
     }
   }
   return response.text();
@@ -548,7 +563,7 @@ export const api = {
           'Authorization': `Bearer ${token}`,
         },
       });
-      return response.json();
+      return handleResponse(response);
     },
     
     markAsRead: async (id: string) => {
@@ -659,107 +674,69 @@ export const api = {
 
     getSavedItems: async () => {
       const token = getAuthToken();
-      try {
-        const response = await fetch(`${API_BASE_URL}/users/me/saved-items`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        });
-        const data = await handleResponse(response);
-        const savedItems = normalizeSavedItemsResponse(data);
-        const ids = savedItems
-          .map((item: any) => item?.id)
-          .filter((id: any) => typeof id === 'string' && id.length > 0);
-
-        setLocalSavedItemIds(ids);
-
-        console.log("API saved items response:", savedItems);
-        return savedItems;
-      } catch (error) {
-        // If API fails, fetch items individually using stored IDs
-        console.warn('Failed to fetch saved items from API, fetching by IDs:', error);
-        const ids = getLocalSavedItemIds();
-        console.log("Local saved item IDs:", ids);
-        if (ids.length === 0) {
-          console.log("No saved item IDs found in localStorage");
-          return [];
-        }
-        
-        // Fetch each item individually
-        const itemPromises = ids.map(async (id) => {
-          try {
-            console.log(`Fetching item ${id}...`);
-            const response = await fetch(`${API_BASE_URL}/items/${id}`);
-            return await handleResponse(response);
-          } catch (err) {
-            console.warn(`Failed to fetch item ${id}:`, err);
-            return null;
-          }
-        });
-        
-        const items = await Promise.all(itemPromises);
-        const validItems = items.filter(Boolean);
-        console.log("Fetched items from IDs:", validItems);
-        return validItems;
+      if (!token) {
+        throw new ApiError(401, 'Please log in to view saved items');
       }
+
+      const response = await fetch(`${API_BASE_URL}/users/me/saved-items`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      const data = await handleResponse(response);
+      const savedItems = normalizeSavedItemsResponse(data);
+      const ids = savedItems
+        .map((item: any) => item?.id)
+        .filter((id: any) => typeof id === 'string' && id.length > 0);
+
+      setLocalSavedItemIds(ids);
+
+      console.log("API saved items response:", savedItems);
+      return savedItems;
     },
 
     saveItem: async (itemId: string, itemData?: any) => {
       const token = getAuthToken();
-      try {
-        const response = await fetch(`${API_BASE_URL}/users/me/saved-items/${itemId}`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        });
-        const data = await handleResponse(response);
-
-        const ids = getLocalSavedItemIds();
-        if (!ids.includes(itemId)) {
-          setLocalSavedItemIds([...ids, itemId]);
-        }
-
-        console.log("Item saved via API:", itemId);
-        return data;
-      } catch (error) {
-        // Only store item ID, not full item data to prevent localStorage quota errors
-        console.log("API save failed, storing ID locally:", itemId);
-        const ids = getLocalSavedItemIds();
-        console.log("Current saved IDs:", ids);
-        if (!ids.includes(itemId)) {
-          const newIds = [...ids, itemId];
-          setLocalSavedItemIds(newIds);
-          console.log("Updated saved IDs:", newIds);
-        }
-        return { success: true, local: true };
+      if (!token) {
+        throw new ApiError(401, 'Please log in to save items');
       }
+
+      const response = await fetch(`${API_BASE_URL}/users/me/saved-items/${itemId}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      const data = await handleResponse(response);
+
+      const ids = getLocalSavedItemIds();
+      if (!ids.includes(itemId)) {
+        setLocalSavedItemIds([...ids, itemId]);
+      }
+
+      console.log("Item saved via API:", itemId);
+      return data;
     },
 
     unsaveItem: async (itemId: string) => {
       const token = getAuthToken();
-      try {
-        const response = await fetch(`${API_BASE_URL}/users/me/saved-items/${itemId}`, {
-          method: 'DELETE',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        });
-        const data = await handleResponse(response);
-
-        const ids = getLocalSavedItemIds().filter((id) => id !== itemId);
-        setLocalSavedItemIds(ids);
-
-        console.log("Item unsaved via API:", itemId);
-        return data;
-      } catch (error) {
-        // Only remove item ID from localStorage
-        console.log("API unsave failed, removing ID locally:", itemId);
-        const ids = getLocalSavedItemIds().filter((id) => id !== itemId);
-        setLocalSavedItemIds(ids);
-        console.log("Updated saved IDs after removal:", ids);
-        return { success: true, local: true };
+      if (!token) {
+        throw new ApiError(401, 'Please log in to manage saved items');
       }
+
+      const response = await fetch(`${API_BASE_URL}/users/me/saved-items/${itemId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      const data = await handleResponse(response);
+
+      const ids = getLocalSavedItemIds().filter((id) => id !== itemId);
+      setLocalSavedItemIds(ids);
+
+      console.log("Item unsaved via API:", itemId);
+      return data;
     },
   },
 };
@@ -776,7 +753,16 @@ export const isAuthenticated = () => {
 export const getStoredUser = () => {
   if (typeof window !== 'undefined') {
     const user = localStorage.getItem('user');
-    return user ? JSON.parse(user) : null;
+    if (!user) {
+      return null;
+    }
+
+    try {
+      return JSON.parse(user);
+    } catch {
+      localStorage.removeItem('user');
+      return null;
+    }
   }
   return null;
 };

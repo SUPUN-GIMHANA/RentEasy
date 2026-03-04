@@ -12,6 +12,7 @@ import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { api } from "@/lib/api-client"
 import { useAuth } from "@/lib/auth-context"
+import { safeJsonParse } from "@/lib/utils"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Calendar } from "@/components/ui/calendar"
 import { LocationSelector } from "@/components/location-selector"
@@ -155,7 +156,7 @@ export default function AddAdvertisementPage() {
       const createdItemId = response?.data?.id || response?.id
       if (createdItemId && typeof window !== "undefined") {
         const createdItemsKey = user?.id ? `myCreatedItemIds:${user.id}` : "myCreatedItemIds"
-        const existingIds = JSON.parse(localStorage.getItem(createdItemsKey) || "[]")
+        const existingIds = safeJsonParse<string[]>(localStorage.getItem(createdItemsKey), [])
         const nextIds = Array.from(new Set([...existingIds, createdItemId]))
         localStorage.setItem(createdItemsKey, JSON.stringify(nextIds))
       }

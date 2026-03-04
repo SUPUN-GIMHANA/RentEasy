@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import type { Booking, Feedback as FeedbackType } from "@/lib/types"
 import { useAuth } from "@/lib/auth-context"
+import { safeJsonParse } from "@/lib/utils"
 import { Star, ArrowLeft } from "lucide-react"
 import Link from "next/link"
 
@@ -31,7 +32,7 @@ export function FeedbackContent() {
     }
 
     if (bookingId) {
-      const storedBookings = JSON.parse(localStorage.getItem("bookings") || "[]")
+      const storedBookings = safeJsonParse<Booking[]>(localStorage.getItem("bookings"), [])
       const foundBooking = storedBookings.find((b: Booking) => b.id === bookingId && b.userId === user?.id)
       setBooking(foundBooking || null)
     }
@@ -52,7 +53,7 @@ export function FeedbackContent() {
       createdAt: new Date().toISOString(),
     }
 
-    const existingFeedback = JSON.parse(localStorage.getItem("feedback") || "[]")
+    const existingFeedback = safeJsonParse<FeedbackType[]>(localStorage.getItem("feedback"), [])
     localStorage.setItem("feedback", JSON.stringify([...existingFeedback, feedback]))
 
     await new Promise((resolve) => setTimeout(resolve, 1000))

@@ -11,6 +11,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { useAuth } from "@/lib/auth-context"
 import { api } from "@/lib/api-client"
 import type { Booking } from "@/lib/types"
+import { safeJsonParse } from "@/lib/utils"
 import { ArrowLeft, CalendarIcon, CreditCard, Landmark, Smartphone, Wallet } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
@@ -137,7 +138,7 @@ export function BookingContent() {
         createdAt: new Date().toISOString(),
       }
 
-      const existingBookings = JSON.parse(localStorage.getItem("bookings") || "[]")
+      const existingBookings = safeJsonParse<Booking[]>(localStorage.getItem("bookings"), [])
       localStorage.setItem("bookings", JSON.stringify([...existingBookings, booking]))
 
       setIsProcessing(false)

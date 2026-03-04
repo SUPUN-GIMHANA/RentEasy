@@ -13,6 +13,7 @@ import { api } from "@/lib/api-client"
 import { useAuth } from "@/lib/auth-context"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { getActiveOfferForItem, getStoredOffers, type StoredOffer } from "@/lib/offer-utils"
+import { safeJsonParse } from "@/lib/utils"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -103,7 +104,7 @@ export default function ManageItemsPage() {
 
         if (normalizedItems.length === 0 && typeof window !== "undefined") {
           const createdItemsKey = user?.id ? `myCreatedItemIds:${user.id}` : "myCreatedItemIds"
-          const createdIds: string[] = JSON.parse(localStorage.getItem(createdItemsKey) || "[]")
+          const createdIds = safeJsonParse<string[]>(localStorage.getItem(createdItemsKey), [])
           if (createdIds.length > 0) {
             const createdIdSet = new Set(createdIds)
             normalizedItems = allItems.filter((item) => createdIdSet.has(item.id))
@@ -159,7 +160,7 @@ export default function ManageItemsPage() {
       await api.items.delete(itemId)
       if (typeof window !== "undefined") {
         const createdItemsKey = user?.id ? `myCreatedItemIds:${user.id}` : "myCreatedItemIds"
-        const createdIds: string[] = JSON.parse(localStorage.getItem(createdItemsKey) || "[]")
+        const createdIds = safeJsonParse<string[]>(localStorage.getItem(createdItemsKey), [])
         localStorage.setItem(createdItemsKey, JSON.stringify(createdIds.filter((id) => id !== itemId)))
       }
       setItems(items.filter((item) => item.id !== itemId))

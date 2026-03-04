@@ -6,7 +6,10 @@ import { Badge } from "@/components/ui/badge"
 import { Heart, MapPin, Star, Calendar } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import { useAuth } from "@/lib/auth-context"
+import { useRouter } from "next/navigation"
+import { api } from "@/lib/api-client"
 
 interface FeaturedRentalCardProps {
   id: string
@@ -35,7 +38,53 @@ export function FeaturedRentalCard({
   responseTime,
   features,
 }: FeaturedRentalCardProps) {
+  const { isAuthenticated } = useAuth()
+  const router = useRouter()
   const [isFavorite, setIsFavorite] = useState(false)
+  const [isUpdatingFavorite, setIsUpdatingFavorite] = useState(false)
+
+  useEffect(() => {
+    const loadSavedState = async () => {
+      if (!isAuthenticated) {
+        setIsFavorite(false)
+        return
+      }
+
+      try {
+        const savedItems = await api.users.getSavedItems()
+        setIsFavorite((savedItems || []).some((item: any) => item?.id === id))
+      } catch {
+        setIsFavorite(false)
+      }
+    }
+
+    loadSavedState()
+  }, [id, isAuthenticated])
+
+  const handleToggleFavorite = async (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+
+    if (!isAuthenticated) {
+      router.push("/login?redirect=/")
+      return
+    }
+
+    try {
+      setIsUpdatingFavorite(true)
+      if (isFavorite) {
+        await api.users.unsaveItem(id)
+        setIsFavorite(false)
+      } else {
+        await api.users.saveItem(id)
+        setIsFavorite(true)
+      }
+    } catch (error) {
+      console.error("Failed to update saved item:", error)
+    } finally {
+      setIsUpdatingFavorite(false)
+    }
+  }
 
   return (
     <Card className="group overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
@@ -48,11 +97,9 @@ export function FeaturedRentalCard({
         />
         <Badge className="absolute top-3 left-3 bg-green-500 text-white border-none">Verified</Badge>
         <button
-          onClick={(e) => {
-            e.preventDefault()
-            setIsFavorite(!isFavorite)
-          }}
-          className="absolute top-3 right-3 w-10 h-10 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center transition-all duration-300 hover:scale-110 hover:bg-white"
+          onClick={handleToggleFavorite}
+          disabled={isUpdatingFavorite}
+          className="absolute top-3 right-3 w-10 h-10 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center transition-all duration-300 hover:scale-110 hover:bg-white disabled:opacity-60"
         >
           <Heart
             className={`h-5 w-5 transition-colors duration-300 ${
@@ -67,7 +114,7 @@ export function FeaturedRentalCard({
           <h3 className="font-semibold text-lg line-clamp-1 group-hover:text-[#2B70FF] transition-colors duration-300">
             {name}
           </h3>
-          <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+          <div className="flex items-center gap-1 shrink-0 ml-2">
             <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
             <span className="font-semibold text-sm">
               {rating} <span className="text-muted-foreground">({reviews})</span>

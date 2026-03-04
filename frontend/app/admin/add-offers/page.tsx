@@ -14,6 +14,7 @@ import Image from "next/image"
 import { api } from "@/lib/api-client"
 import { useAuth } from "@/lib/auth-context"
 import { saveStoredOffer } from "@/lib/offer-utils"
+import { safeJsonParse } from "@/lib/utils"
 
 interface OfferItem {
   id: string
@@ -72,7 +73,7 @@ export default function AddOffersPage() {
 
         if (normalizedItems.length === 0 && typeof window !== "undefined") {
           const createdItemsKey = user?.id ? `myCreatedItemIds:${user.id}` : "myCreatedItemIds"
-          const createdIds: string[] = JSON.parse(localStorage.getItem(createdItemsKey) || "[]")
+            const createdIds = safeJsonParse<string[]>(localStorage.getItem(createdItemsKey), [])
           if (createdIds.length > 0) {
             const createdIdSet = new Set(createdIds)
             normalizedItems = allItemsData.filter((item) => createdIdSet.has(item.id))

@@ -45,7 +45,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(userData)
         }
       } catch (error) {
-        if (!(error instanceof ApiError && (error.status === 401 || error.status === 403))) {
+        if (!(error instanceof ApiError && (error.status === 0 || error.status === 401 || error.status === 403))) {
           console.error("Failed to load user:", error)
         }
         api.auth.logout()

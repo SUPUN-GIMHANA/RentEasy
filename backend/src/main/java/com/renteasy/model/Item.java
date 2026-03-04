@@ -1,9 +1,12 @@
 package com.renteasy.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
@@ -19,6 +22,8 @@ import java.util.Set;
 @Entity
 @Table(name = "items")
 @Data
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
+@ToString(exclude = {"owner", "bookings", "comments", "savedByUsers"})
 @NoArgsConstructor
 @AllArgsConstructor
 @EntityListeners(AuditingEntityListener.class)
@@ -26,6 +31,7 @@ public class Item {
     
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
+    @EqualsAndHashCode.Include
     private String id;
     
     @Column(nullable = false)
@@ -60,6 +66,7 @@ public class Item {
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "owner_id", nullable = false)
+    @JsonIgnore
     private User owner;
 
     @Column(name = "owner_phone_number")
@@ -87,11 +94,14 @@ public class Item {
     private LocalDateTime updatedAt;
     
     @OneToMany(mappedBy = "item", cascade = CascadeType.ALL)
+    @JsonIgnore
     private Set<Booking> bookings = new HashSet<>();
     
     @OneToMany(mappedBy = "item", cascade = CascadeType.ALL)
+    @JsonIgnore
     private Set<Comment> comments = new HashSet<>();
     
     @ManyToMany(mappedBy = "savedItems")
+    @JsonIgnore
     private Set<User> savedByUsers = new HashSet<>();
 }
