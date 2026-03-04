@@ -17,6 +17,7 @@ import { useRouter } from "next/navigation"
 import { useSearchParams } from "next/navigation"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { getActiveOfferForItem, getStoredOffers, type StoredOffer } from "@/lib/offer-utils"
+import { connectToItemUpdates } from "@/lib/item-realtime"
 
 const categories = ["vehicles", "properties", "electronics", "clothing", "tools", "sports", "camping", "events"]
 
@@ -110,6 +111,7 @@ export default function BrowsePage() {
   const [savingItemId, setSavingItemId] = useState<string | null>(null)
   const [offers, setOffers] = useState<StoredOffer[]>([])
   const [selectedOffer, setSelectedOffer] = useState<StoredOffer | null>(null)
+  const [realtimeVersion, setRealtimeVersion] = useState(0)
 
   useEffect(() => {
     const categoryFromParams = searchParams.get("category")
@@ -199,7 +201,17 @@ export default function BrowsePage() {
 
   useEffect(() => {
     loadItems()
-  }, [page, selectedCategory, selectedSubcategory, selectedLat, selectedLng, selectedRadiusKm, appliedSearchQuery, hasSubmittedSearch])
+  }, [page, selectedCategory, selectedSubcategory, selectedLat, selectedLng, selectedRadiusKm, appliedSearchQuery, hasSubmittedSearch, realtimeVersion])
+
+  useEffect(() => {
+    const disconnect = connectToItemUpdates(() => {
+      setRealtimeVersion((prev) => prev + 1)
+    })
+
+    return () => {
+      disconnect()
+    }
+  }, [])
 
   useEffect(() => {
     const loadSavedItems = async () => {

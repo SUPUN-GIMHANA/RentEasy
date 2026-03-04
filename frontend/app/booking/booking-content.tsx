@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { useAuth } from "@/lib/auth-context"
-import { api } from "@/lib/api-client"
+import { api, ApiError } from "@/lib/api-client"
 import type { Booking } from "@/lib/types"
 import { safeJsonParse } from "@/lib/utils"
 import { ArrowLeft, CalendarIcon, CreditCard, Landmark, Smartphone, Wallet } from "lucide-react"
@@ -25,6 +25,7 @@ export function BookingContent() {
   const [item, setItem] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [isProcessing, setIsProcessing] = useState(false)
+  const [bookingError, setBookingError] = useState("")
   const [agreedToTerms, setAgreedToTerms] = useState(false)
   const [paymentMethod, setPaymentMethod] = useState<string>("card")
   const { user, isAuthenticated } = useAuth()
@@ -110,6 +111,7 @@ export function BookingContent() {
   const totalAmount = Math.round((rentalFee + serviceFee + bookingFee) * 100) / 100
 
   const handleBooking = async () => {
+    setBookingError("")
     setIsProcessing(true)
 
     try {
@@ -142,11 +144,16 @@ export function BookingContent() {
       localStorage.setItem("bookings", JSON.stringify([...existingBookings, booking]))
 
       setIsProcessing(false)
-      router.push(`/booking/success?bookingId=${booking.id}`)
+      router.push("/orders")
     } catch (error) {
-      console.error("Booking error:", error)
+      if (error instanceof ApiError && error.message.toLowerCase().includes("already booked")) {
+        setBookingError("This item is already booked for the selected dates. Please choose different dates.")
+      } else if (error instanceof ApiError) {
+        setBookingError(error.message || "Failed to create booking. Please try again.")
+      } else {
+        setBookingError("Failed to create booking. Please try again.")
+      }
       setIsProcessing(false)
-      alert("Failed to create booking. Please try again.")
     }
   }
 
@@ -168,6 +175,12 @@ export function BookingContent() {
 
       <div className="max-w-4xl mx-auto">
         <h1 className="text-3xl font-bold mb-8">Complete Your Booking</h1>
+
+        {bookingError && (
+          <div className="mb-6 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+            {bookingError}
+          </div>
+        )}
 
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Booking Details */}

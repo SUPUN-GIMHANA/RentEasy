@@ -4,6 +4,7 @@ import com.renteasy.dto.ApiResponse;
 import com.renteasy.dto.ItemRequest;
 import com.renteasy.dto.ItemDTO;
 import com.renteasy.model.Item;
+import com.renteasy.service.ItemRealtimePublisher;
 import com.renteasy.service.ItemService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -30,8 +31,8 @@ import java.util.stream.Collectors;
 public class ItemController {
 
     private static final int MAX_ITEM_IMAGES = 5;
-    
     private final ItemService itemService;
+    private final ItemRealtimePublisher itemRealtimePublisher;
     
     @PostMapping(consumes = "multipart/form-data")
     public ResponseEntity<?> createItemWithImages(
@@ -126,8 +127,10 @@ public class ItemController {
             }
             
             Item item = itemService.createItem(request, userId);
+            ItemDTO itemDTO = convertToDTO(item);
+            itemRealtimePublisher.publishCreated(item.getId(), itemDTO);
             return ResponseEntity.status(HttpStatus.CREATED)
-                .body(new ApiResponse(true, "Item created successfully", convertToDTO(item)));
+                .body(new ApiResponse(true, "Item created successfully", itemDTO));
         } catch (IOException e) {
             return ResponseEntity.badRequest()
                 .body(new ApiResponse(false, "Error processing image files: " + e.getMessage()));
@@ -143,8 +146,10 @@ public class ItemController {
         try {
             String userId = getUserIdFromAuthentication(authentication);
             Item item = itemService.createItem(request, userId);
+            ItemDTO itemDTO = convertToDTO(item);
+            itemRealtimePublisher.publishCreated(item.getId(), itemDTO);
             return ResponseEntity.status(HttpStatus.CREATED)
-                .body(new ApiResponse(true, "Item created successfully", convertToDTO(item)));
+                .body(new ApiResponse(true, "Item created successfully", itemDTO));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest()
                 .body(new ApiResponse(false, e.getMessage()));
@@ -158,7 +163,9 @@ public class ItemController {
         try {
             String userId = getUserIdFromAuthentication(authentication);
             Item item = itemService.updateItem(id, request, userId);
-            return ResponseEntity.ok(new ApiResponse(true, "Item updated successfully", convertToDTO(item)));
+            ItemDTO itemDTO = convertToDTO(item);
+            itemRealtimePublisher.publishUpdated(item.getId(), itemDTO);
+            return ResponseEntity.ok(new ApiResponse(true, "Item updated successfully", itemDTO));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest()
                 .body(new ApiResponse(false, e.getMessage()));
@@ -301,6 +308,7 @@ public class ItemController {
         try {
             String userId = getUserIdFromAuthentication(authentication);
             itemService.deleteItem(id, userId);
+            itemRealtimePublisher.publishDeleted(id);
             return ResponseEntity.ok(new ApiResponse(true, "Item deleted successfully"));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest()
@@ -368,4 +376,5 @@ public class ItemController {
         }
         return dto;
     }
+
 }
