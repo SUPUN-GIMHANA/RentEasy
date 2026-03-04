@@ -66,6 +66,8 @@ public class Item {
     private String ownerPhoneNumber;
     
     private String location;
+    private Double latitude;
+    private Double longitude;
     private Integer minimumRentalPeriod = 1; // days
     private Integer maximumRentalPeriod = 30; // days
     

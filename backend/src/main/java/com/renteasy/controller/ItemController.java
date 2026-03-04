@@ -40,6 +40,8 @@ public class ItemController {
             @RequestParam(value = "subcategory", required = false) String subcategory,
             @RequestParam("price") String price,
             @RequestParam("location") String location,
+            @RequestParam(value = "latitude", required = false) String latitude,
+            @RequestParam(value = "longitude", required = false) String longitude,
             @RequestParam(value = "ownerPhoneNumber", required = false) String ownerPhoneNumber,
             @RequestParam("description") String description,
             @RequestParam(value = "minimumRentalPeriod", required = false) String minimumRentalPeriod,
@@ -59,6 +61,12 @@ public class ItemController {
             }
             request.setPrice(new java.math.BigDecimal(price));
             request.setLocation(location);
+            if (latitude != null && !latitude.trim().isEmpty()) {
+                request.setLatitude(Double.parseDouble(latitude.trim()));
+            }
+            if (longitude != null && !longitude.trim().isEmpty()) {
+                request.setLongitude(Double.parseDouble(longitude.trim()));
+            }
             request.setOwnerPhoneNumber(ownerPhoneNumber);
             request.setDescription(description);
             request.setAvailable(Boolean.parseBoolean(available));
@@ -157,7 +165,7 @@ public class ItemController {
         }
     }
     
-    @GetMapping("/{id}")
+    @GetMapping("/{id:[0-9a-fA-F\\-]{36}}")
     public ResponseEntity<?> getItemById(@PathVariable String id) {
         try {
             Item item = itemService.getItemById(id);
@@ -204,6 +212,37 @@ public class ItemController {
             @RequestParam(defaultValue = "12") int size) {
         Page<Item> items = itemService.searchItems(query, page, size);
         return ResponseEntity.ok(items.map(this::convertToDTO));
+    }
+
+    @GetMapping("/location")
+    public ResponseEntity<Page<ItemDTO>> searchItemsByLocation(
+            @RequestParam String query,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "12") int size) {
+        Page<Item> items = itemService.searchItemsByLocation(query, page, size);
+        return ResponseEntity.ok(items.map(this::convertToDTO));
+    }
+
+    @GetMapping("/nearby")
+    public ResponseEntity<Page<ItemDTO>> getNearbyItems(
+            @RequestParam double lat,
+            @RequestParam double lng,
+            @RequestParam(defaultValue = "10") double radiusKm,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "12") int size) {
+        Page<Item> nearbyItems = itemService.getNearbyItems(lat, lng, radiusKm, page, size);
+        java.util.Map<String, Double> distances = itemService.getDistancesByItemId(lat, lng, nearbyItems.getContent());
+
+        Page<ItemDTO> result = nearbyItems.map(item -> {
+            ItemDTO dto = convertToDTO(item);
+            Double distanceKm = distances.get(item.getId());
+            if (distanceKm != null) {
+                dto.setDistanceKm(Math.round(distanceKm * 100.0) / 100.0);
+            }
+            return dto;
+        });
+
+        return ResponseEntity.ok(result);
     }
     
     @GetMapping("/boosted")
@@ -309,6 +348,8 @@ public class ItemController {
         dto.setAvailableDates(item.getAvailableDates() == null ? null
             : item.getAvailableDates().stream().map(java.time.LocalDate::toString).collect(Collectors.toList()));
         dto.setLocation(item.getLocation());
+        dto.setLatitude(item.getLatitude());
+        dto.setLongitude(item.getLongitude());
         String ownerPhoneNumber = item.getOwnerPhoneNumber();
         if ((ownerPhoneNumber == null || ownerPhoneNumber.trim().isEmpty()) && item.getOwner() != null) {
             ownerPhoneNumber = item.getOwner().getPhoneNumber();

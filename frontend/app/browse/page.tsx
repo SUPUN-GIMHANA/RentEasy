@@ -14,6 +14,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { useAuth } from "@/lib/auth-context"
 import { useRouter } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { getActiveOfferForItem, getStoredOffers, type StoredOffer } from "@/lib/offer-utils"
 
@@ -30,6 +31,17 @@ const subcategories: Record<string, string[]> = {
   events: ["Electric items", "Event items"],
 }
 
+const cityCoordinates: Record<string, { label: string; lat: number; lng: number }> = {
+  colombo: { label: "Colombo", lat: 6.9271, lng: 79.8612 },
+  kandy: { label: "Kandy", lat: 7.2906, lng: 80.6337 },
+  galle: { label: "Galle", lat: 6.0535, lng: 80.221 },
+  jaffna: { label: "Jaffna", lat: 9.6615, lng: 80.0255 },
+  negombo: { label: "Negombo", lat: 7.2083, lng: 79.8358 },
+  anuradhapura: { label: "Anuradhapura", lat: 8.3114, lng: 80.4037 },
+  trincomalee: { label: "Trincomalee", lat: 8.5874, lng: 81.2152 },
+  batticaloa: { label: "Batticaloa", lat: 7.717, lng: 81.7 },
+}
+
 interface Item {
   id: string
   name: string
@@ -39,29 +51,155 @@ interface Item {
   price: number
   imageUrl: string
   available: boolean
+  location?: string
+  latitude?: number
+  longitude?: number
+  distanceKm?: number
   rating?: number
+}
+
+const normalizeLocationText = (value?: string) => (value || "").trim().toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ")
+
+const calculateDistanceKm = (fromLat: number, fromLng: number, toLat: number, toLng: number) => {
+  const earthRadiusKm = 6371
+  const dLat = ((toLat - fromLat) * Math.PI) / 180
+  const dLng = ((toLng - fromLng) * Math.PI) / 180
+  const lat1 = (fromLat * Math.PI) / 180
+  const lat2 = (toLat * Math.PI) / 180
+
+  const a = Math.sin(dLat / 2) ** 2 + Math.sin(dLng / 2) ** 2 * Math.cos(lat1) * Math.cos(lat2)
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  return earthRadiusKm * c
+}
+
+const getLocationCoordinatesFromText = (locationText?: string): { lat: number; lng: number } | null => {
+  const normalized = normalizeLocationText(locationText)
+  if (!normalized) {
+    return null
+  }
+
+  for (const [key, city] of Object.entries(cityCoordinates)) {
+    if (normalized.includes(key) || key.includes(normalized)) {
+      return { lat: city.lat, lng: city.lng }
+    }
+  }
+
+  return null
 }
 
 export default function BrowsePage() {
   const { isAuthenticated } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [items, setItems] = useState<Item[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [page, setPage] = useState(0)
   const [totalPages, setTotalPages] = useState(0)
   const [searchQuery, setSearchQuery] = useState("")
+  const [appliedSearchQuery, setAppliedSearchQuery] = useState("")
+  const [hasSubmittedSearch, setHasSubmittedSearch] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState("all")
   const [selectedSubcategory, setSelectedSubcategory] = useState("all")
+  const [selectedRadiusKm, setSelectedRadiusKm] = useState("10")
   const [sortBy, setSortBy] = useState("name")
+  const [selectedLocation, setSelectedLocation] = useState("")
+  const [selectedLat, setSelectedLat] = useState<number | null>(null)
+  const [selectedLng, setSelectedLng] = useState<number | null>(null)
   const [savedItemIds, setSavedItemIds] = useState<Set<string>>(new Set())
   const [savingItemId, setSavingItemId] = useState<string | null>(null)
   const [offers, setOffers] = useState<StoredOffer[]>([])
   const [selectedOffer, setSelectedOffer] = useState<StoredOffer | null>(null)
 
   useEffect(() => {
+    const categoryFromParams = searchParams.get("category")
+    const subcategoryFromParams = searchParams.get("subcategory")
+    const locationFromParams = searchParams.get("location") || ""
+    const radiusFromParams = searchParams.get("radiusKm") || "10"
+    const latFromParams = searchParams.get("lat")
+    const lngFromParams = searchParams.get("lng")
+
+    if (categoryFromParams && categories.includes(categoryFromParams)) {
+      setSelectedCategory(categoryFromParams)
+    }
+    if (subcategoryFromParams) {
+      setSelectedSubcategory(subcategoryFromParams)
+    }
+    setSelectedLocation(locationFromParams)
+    setSelectedRadiusKm(radiusFromParams)
+
+    if (latFromParams && lngFromParams) {
+      const parsedLat = Number(latFromParams)
+      const parsedLng = Number(lngFromParams)
+      if (!Number.isNaN(parsedLat) && !Number.isNaN(parsedLng)) {
+        setSelectedLat(parsedLat)
+        setSelectedLng(parsedLng)
+        setHasSubmittedSearch(Boolean(locationFromParams))
+      } else {
+        setSelectedLat(null)
+        setSelectedLng(null)
+        setHasSubmittedSearch(false)
+      }
+    } else {
+      setSelectedLat(null)
+      setSelectedLng(null)
+      setHasSubmittedSearch(false)
+    }
+  }, [searchParams])
+
+  useEffect(() => {
+    const geocodeLocationForNearby = async () => {
+      if (!selectedLocation.trim() || selectedLat !== null || selectedLng !== null) {
+        return
+      }
+
+      try {
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(selectedLocation)}&format=json&limit=1`,
+          {
+            headers: {
+              "Accept": "application/json",
+            },
+          }
+        )
+
+        if (!response.ok) {
+          return
+        }
+
+        const data = await response.json()
+        const first = Array.isArray(data) ? data[0] : null
+        if (!first) {
+          return
+        }
+
+        const lat = Number(first.lat)
+        const lng = Number(first.lon)
+        if (Number.isNaN(lat) || Number.isNaN(lng)) {
+          return
+        }
+
+        setSelectedLat(lat)
+        setSelectedLng(lng)
+
+        const nextParams = new URLSearchParams(searchParams.toString())
+        nextParams.set("lat", String(lat))
+        nextParams.set("lng", String(lng))
+        if (!nextParams.get("radiusKm")) {
+          nextParams.set("radiusKm", "10")
+        }
+        router.replace(`/browse?${nextParams.toString()}`)
+      } catch {
+        // Ignore geocoding failures and keep text-only browsing
+      }
+    }
+
+    geocodeLocationForNearby()
+  }, [selectedLocation, selectedLat, selectedLng, router, searchParams])
+
+  useEffect(() => {
     loadItems()
-  }, [page, selectedCategory, selectedSubcategory])
+  }, [page, selectedCategory, selectedSubcategory, selectedLat, selectedLng, selectedRadiusKm, appliedSearchQuery, hasSubmittedSearch])
 
   useEffect(() => {
     const loadSavedItems = async () => {
@@ -97,21 +235,151 @@ export default function BrowsePage() {
       setError("")
       
       let response
+      let effectiveTotalPages = 0
       console.log("Loading items:", { selectedCategory, selectedSubcategory, page })
+
+      const hasNearbyCoordinates = typeof selectedLat === "number" && typeof selectedLng === "number"
+      const radiusKmNumber = Number(selectedRadiusKm)
+      const safeRadius = Number.isNaN(radiusKmNumber) ? 10 : radiusKmNumber
+      const normalizedKeyword = appliedSearchQuery.trim().toLowerCase()
+
+      if (hasNearbyCoordinates && selectedLocation && !hasSubmittedSearch) {
+        setItems([])
+        setTotalPages(0)
+        return
+      }
       
-      if (selectedCategory === "all") {
+      if (hasNearbyCoordinates && selectedCategory === "all") {
+        let nearbyResponse: { content: Item[]; totalPages: number } = { content: [], totalPages: 0 }
+        let locationResponse: { content: Item[]; totalPages: number } = { content: [], totalPages: 0 }
+
+        try {
+          const nearbyApiResponse = await api.items.getNearby(selectedLat as number, selectedLng as number, safeRadius, page, 12)
+          nearbyResponse = {
+            content: nearbyApiResponse.content || [],
+            totalPages: nearbyApiResponse.totalPages || 0,
+          }
+        } catch {
+          nearbyResponse = { content: [], totalPages: 0 }
+        }
+
+        if (selectedLocation.trim()) {
+          try {
+            const locationApiResponse = await api.items.searchByLocation(selectedLocation.trim(), page, 12)
+            locationResponse = {
+              content: locationApiResponse.content || [],
+              totalPages: locationApiResponse.totalPages || 0,
+            }
+          } catch {
+            locationResponse = { content: [], totalPages: 0 }
+          }
+        }
+
+        if (nearbyResponse.content.length === 0 && locationResponse.content.length === 0) {
+          response = {
+            content: [],
+            totalPages: 0,
+          }
+          effectiveTotalPages = 0
+          console.log("API Response:", response)
+          setItems([])
+          setTotalPages(0)
+          return
+        }
+
+        const combinedMap = new Map<string, Item>()
+        ;(nearbyResponse.content || []).forEach((item: Item) => combinedMap.set(item.id, item))
+        ;(locationResponse.content || []).forEach((item: Item) => {
+          if (!combinedMap.has(item.id)) {
+            combinedMap.set(item.id, item)
+          }
+        })
+
+        const normalizedSelectedLocation = normalizeLocationText(selectedLocation)
+        const mergedItems = Array.from(combinedMap.values())
+          .map((item) => {
+            const itemLat = item.latitude
+            const itemLng = item.longitude
+
+            if (typeof itemLat === "number" && typeof itemLng === "number") {
+              const distanceKm = calculateDistanceKm(selectedLat as number, selectedLng as number, itemLat, itemLng)
+              return { ...item, distanceKm }
+            }
+
+            const coordsFromText = getLocationCoordinatesFromText(item.location)
+            if (coordsFromText) {
+              const distanceKm = calculateDistanceKm(
+                selectedLat as number,
+                selectedLng as number,
+                coordsFromText.lat,
+                coordsFromText.lng
+              )
+              return { ...item, distanceKm }
+            }
+
+            return item
+          })
+          .filter((item) => {
+            if (typeof item.distanceKm === "number") {
+              return item.distanceKm <= safeRadius
+            }
+
+            const itemLocation = normalizeLocationText(item.location)
+            if (!itemLocation || !normalizedSelectedLocation) {
+              return false
+            }
+
+            return itemLocation.includes(normalizedSelectedLocation) || normalizedSelectedLocation.includes(itemLocation)
+          })
+          .sort((a, b) => {
+            const distanceA = typeof a.distanceKm === "number" ? a.distanceKm : Number.MAX_SAFE_INTEGER
+            const distanceB = typeof b.distanceKm === "number" ? b.distanceKm : Number.MAX_SAFE_INTEGER
+            return distanceA - distanceB
+          })
+
+        response = {
+          ...nearbyResponse,
+          content: mergedItems,
+          totalPages: Math.max(nearbyResponse.totalPages || 0, locationResponse.totalPages || 0, mergedItems.length > 0 ? 1 : 0),
+        }
+        effectiveTotalPages = response.totalPages || 0
+      } else if (selectedCategory === "all" && normalizedKeyword) {
+        response = await api.items.search(appliedSearchQuery, page, 12)
+        effectiveTotalPages = response.totalPages || 0
+      } else if (selectedCategory === "all") {
         response = await api.items.getAll(page, 12)
+        effectiveTotalPages = response.totalPages || 0
       } else if (selectedSubcategory === "all") {
         console.log("Fetching by category only:", selectedCategory)
         response = await api.items.getByCategory(selectedCategory, page, 12)
+        effectiveTotalPages = response.totalPages || 0
       } else {
         console.log("Fetching by category and subcategory:", selectedCategory, selectedSubcategory)
         response = await api.items.getByCategory(selectedCategory, page, 12, selectedSubcategory)
+        effectiveTotalPages = response.totalPages || 0
       }
       
       console.log("API Response:", response)
-      setItems(response.content || [])
-      setTotalPages(response.totalPages || 0)
+      let nextItems: Item[] = response.content || []
+
+      if (normalizedKeyword && (hasNearbyCoordinates || selectedCategory !== "all")) {
+        nextItems = nextItems.filter((item) => {
+          const searchableText = [
+            item.name,
+            item.description,
+            item.category,
+            item.subcategory || "",
+            item.location || "",
+          ]
+            .join(" ")
+            .toLowerCase()
+
+          return searchableText.includes(normalizedKeyword)
+        })
+      }
+
+      setItems(nextItems)
+      setTotalPages(hasNearbyCoordinates && normalizedKeyword ? 1 : effectiveTotalPages)
     } catch (error: any) {
       console.error("Failed to load items:", error)
       setError(error.message || "Failed to load items")
@@ -122,15 +390,94 @@ export default function BrowsePage() {
   }
 
   const handleSearch = async () => {
-    if (!searchQuery.trim()) {
+    const trimmedQuery = searchQuery.trim()
+
+    if (!trimmedQuery) {
+      setHasSubmittedSearch(false)
+      setAppliedSearchQuery("")
       loadItems()
       return
     }
 
     try {
+      setPage(0)
+      setHasSubmittedSearch(true)
+      const normalizedQuery = trimmedQuery.toLowerCase()
+      const cleanedLocationQuery = normalizedQuery
+        .replace(/\b(near|around|in|at)\b/gi, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+
+      let resolvedLocation: { name: string; lat: number; lng: number } | null = null
+      let keywordOnlyQuery = trimmedQuery
+
+      for (const [cityKey, cityValue] of Object.entries(cityCoordinates)) {
+        if (normalizedQuery.includes(cityKey) || (cleanedLocationQuery && cleanedLocationQuery.includes(cityKey))) {
+          resolvedLocation = { name: cityValue.label, lat: cityValue.lat, lng: cityValue.lng }
+          keywordOnlyQuery = keywordOnlyQuery.replace(new RegExp(`\\b${cityValue.label}\\b`, "ig"), " ")
+          break
+        }
+      }
+
+      if (!resolvedLocation && cleanedLocationQuery) {
+        try {
+          const geocodeResponse = await fetch(
+            `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(cleanedLocationQuery)}&format=json&limit=1`,
+            {
+              headers: {
+                Accept: "application/json",
+              },
+            }
+          )
+
+          if (geocodeResponse.ok) {
+            const geocodeData = await geocodeResponse.json()
+            const first = Array.isArray(geocodeData) ? geocodeData[0] : null
+            if (first) {
+              const lat = Number(first.lat)
+              const lng = Number(first.lon)
+              if (!Number.isNaN(lat) && !Number.isNaN(lng)) {
+                resolvedLocation = {
+                  name: cleanedLocationQuery,
+                  lat,
+                  lng,
+                }
+                keywordOnlyQuery = ""
+              }
+            }
+          }
+        } catch {
+          // Fallback to text search if geocoding fails
+        }
+      }
+
+      const normalizedKeywordOnly = keywordOnlyQuery
+        .replace(/\b(items?|rentals?|search|show|me|find)\b/gi, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+
+      if (resolvedLocation) {
+        setError("")
+        setSelectedLocation(resolvedLocation.name)
+        setSelectedLat(resolvedLocation.lat)
+        setSelectedLng(resolvedLocation.lng)
+        setSelectedRadiusKm("10")
+        setAppliedSearchQuery(normalizedKeywordOnly)
+
+        const nextParams = new URLSearchParams(searchParams.toString())
+        nextParams.set("location", resolvedLocation.name)
+        nextParams.set("lat", String(resolvedLocation.lat))
+        nextParams.set("lng", String(resolvedLocation.lng))
+        nextParams.set("radiusKm", "10")
+        router.replace(`/browse?${nextParams.toString()}`)
+        return
+      }
+
+      setAppliedSearchQuery(trimmedQuery)
+
       setLoading(true)
       setError("")
-      const response = await api.items.search(searchQuery, page, 12)
+      const response = await api.items.search(trimmedQuery, page, 12)
       setItems(response.content || [])
       setTotalPages(response.totalPages || 0)
     } catch (error: any) {
@@ -302,19 +649,54 @@ export default function BrowsePage() {
               </SelectContent>
             </Select>
 
+            {selectedLat !== null && selectedLng !== null && (
+              <Select
+                value={selectedRadiusKm}
+                onValueChange={(value) => {
+                  setSelectedRadiusKm(value)
+                  const nextParams = new URLSearchParams(searchParams.toString())
+                  nextParams.set("radiusKm", value)
+                  router.replace(`/browse?${nextParams.toString()}`)
+                }}
+              >
+                <SelectTrigger className="w-full md:w-45">
+                  <SelectValue placeholder="Radius" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="5">5 km</SelectItem>
+                  <SelectItem value="10">10 km</SelectItem>
+                  <SelectItem value="20">20 km</SelectItem>
+                  <SelectItem value="50">50 km</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
+
             <Button 
               variant="outline" 
               onClick={() => {
                 setSearchQuery("")
+                setAppliedSearchQuery("")
+                setHasSubmittedSearch(false)
                 setSelectedCategory("all")
                 setSelectedSubcategory("all")
                 setSortBy("name")
-                loadItems()
+                setSelectedRadiusKm("10")
+                setSelectedLocation("")
+                setSelectedLat(null)
+                setSelectedLng(null)
+                router.replace("/browse")
               }}
             >
               Reset
             </Button>
           </div>
+
+          {selectedLocation && (
+            <p className="text-sm text-muted-foreground">
+              Searching near: {selectedLocation}
+              {selectedLat !== null && selectedLng !== null ? ` (${selectedRadiusKm} km radius)` : ""}
+            </p>
+          )}
         </div>
 
         {/* Loading State */}
@@ -383,6 +765,9 @@ export default function BrowsePage() {
                     <CardContent className="pt-4">
                       <h3 className="font-semibold text-lg mb-2 line-clamp-1">{item.name}</h3>
                       <p className="text-sm text-muted-foreground mb-2 line-clamp-2">{item.description}</p>
+                      {typeof item.distanceKm === "number" && (
+                        <p className="text-xs text-muted-foreground mb-2">{item.distanceKm.toFixed(2)} km away</p>
+                      )}
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex gap-1 flex-wrap">
                           <Badge variant="outline">{item.category}</Badge>
@@ -415,13 +800,19 @@ export default function BrowsePage() {
         {!loading && filteredAndSortedItems.length === 0 && (
           <div className="text-center py-16">
             <p className="text-muted-foreground text-lg">
-              {searchQuery ? "No items found matching your search." : "No items available."}
+              {selectedLat !== null && selectedLng !== null && selectedLocation && !hasSubmittedSearch
+                ? "Search for an item to see nearby results in this location."
+                : searchQuery
+                ? "No items found matching your search."
+                : "No items available."}
             </p>
             {searchQuery && (
               <Button 
                 variant="outline" 
                 onClick={() => { 
                   setSearchQuery("")
+                  setAppliedSearchQuery("")
+                  setHasSubmittedSearch(false)
                   loadItems()
                 }} 
                 className="mt-4"

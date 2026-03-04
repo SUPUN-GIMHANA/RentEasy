@@ -24,12 +24,16 @@ interface SavedItem {
 }
 
 export default function SavesPage() {
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, isLoading: isAuthLoading } = useAuth()
   const router = useRouter()
   const [savedItems, setSavedItems] = useState<SavedItem[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    if (isAuthLoading) {
+      return
+    }
+
     if (!isAuthenticated) {
       router.push("/login")
       return
@@ -51,7 +55,7 @@ export default function SavesPage() {
     }
 
     loadSavedItems()
-  }, [isAuthenticated, router])
+  }, [isAuthenticated, isAuthLoading, router])
 
   const handleUnsave = async (itemId: string) => {
     try {
@@ -60,6 +64,18 @@ export default function SavesPage() {
     } catch (error) {
       console.error("Failed to remove saved item:", error)
     }
+  }
+
+  if (isAuthLoading) {
+    return (
+      <div className="min-h-screen bg-linear-to-br from-gray-50 via-white to-blue-50">
+        <Header />
+        <div className="container mx-auto px-4 py-12">
+          <div className="max-w-6xl mx-auto text-center py-12 text-muted-foreground">Loading...</div>
+        </div>
+        <Footer />
+      </div>
+    )
   }
 
   if (!isAuthenticated) {

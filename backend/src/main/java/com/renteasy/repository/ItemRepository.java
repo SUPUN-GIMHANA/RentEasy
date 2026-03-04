@@ -14,6 +14,8 @@ import java.util.List;
 public interface ItemRepository extends JpaRepository<Item, String> {
     
     Page<Item> findByAvailableTrue(Pageable pageable);
+
+       List<Item> findByAvailableTrueAndLatitudeIsNotNullAndLongitudeIsNotNull();
     
     @Query("SELECT i FROM Item i WHERE i.available = true AND LOWER(i.category) = LOWER(:category)")
     Page<Item> findByCategoryAndAvailableTrue(@Param("category") String category, Pageable pageable);
@@ -32,6 +34,11 @@ public interface ItemRepository extends JpaRepository<Item, String> {
            "(LOWER(i.name) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
            "LOWER(i.description) LIKE LOWER(CONCAT('%', :searchTerm, '%')))")
     Page<Item> searchItems(@Param("searchTerm") String searchTerm, Pageable pageable);
+
+    @Query("SELECT i FROM Item i WHERE i.available = true AND " +
+           "i.location IS NOT NULL AND " +
+           "LOWER(i.location) LIKE LOWER(CONCAT('%', :location, '%'))")
+    Page<Item> searchItemsByLocation(@Param("location") String location, Pageable pageable);
     
     @Query("SELECT i FROM Item i WHERE i.boosted = true AND i.boostedUntil > CURRENT_TIMESTAMP " +
            "AND i.available = true ORDER BY i.boostedUntil DESC")

@@ -83,6 +83,22 @@ const setLocalSavedItemsMap = (map: Record<string, any>) => {
   localStorage.setItem(getScopedKey(SAVED_ITEMS_MAP_KEY), JSON.stringify(map || {}));
 };
 
+const normalizeSavedItemsResponse = (payload: any): any[] => {
+  if (Array.isArray(payload)) {
+    return payload;
+  }
+
+  if (payload && Array.isArray(payload.content)) {
+    return payload.content;
+  }
+
+  if (payload && Array.isArray(payload.data)) {
+    return payload.data;
+  }
+
+  return [];
+};
+
 // Helper function to handle API responses
 const handleResponse = async (response: Response) => {
   if (!response.ok) {
@@ -211,6 +227,13 @@ export const api = {
       );
       return handleResponse(response);
     },
+
+    searchByLocation: async (query: string, page = 0, size = 12) => {
+      const response = await fetch(
+        `${API_BASE_URL}/items/location?query=${encodeURIComponent(query)}&page=${page}&size=${size}`
+      );
+      return handleResponse(response);
+    },
     
     getByCategory: async (category: string, page = 0, size = 12, subcategory?: string) => {
       let url = `${API_BASE_URL}/items/category/${category}?page=${page}&size=${size}`;
@@ -218,6 +241,13 @@ export const api = {
         url += `&subcategory=${encodeURIComponent(subcategory)}`;
       }
       const response = await fetch(url);
+      return handleResponse(response);
+    },
+
+    getNearby: async (lat: number, lng: number, radiusKm = 10, page = 0, size = 12) => {
+      const response = await fetch(
+        `${API_BASE_URL}/items/nearby?lat=${lat}&lng=${lng}&radiusKm=${radiusKm}&page=${page}&size=${size}`
+      );
       return handleResponse(response);
     },
     
@@ -254,6 +284,12 @@ export const api = {
       }
       formData.append('price', data.price.toString());
       formData.append('location', data.location);
+      if (typeof data.latitude === 'number') {
+        formData.append('latitude', data.latitude.toString());
+      }
+      if (typeof data.longitude === 'number') {
+        formData.append('longitude', data.longitude.toString());
+      }
       formData.append('description', data.description);
       formData.append('available', data.available?.toString() || 'true');
       if (data.ownerPhoneNumber) {
@@ -630,8 +666,15 @@ export const api = {
           },
         });
         const data = await handleResponse(response);
-        console.log("API saved items response:", data);
-        return data;
+        const savedItems = normalizeSavedItemsResponse(data);
+        const ids = savedItems
+          .map((item: any) => item?.id)
+          .filter((id: any) => typeof id === 'string' && id.length > 0);
+
+        setLocalSavedItemIds(ids);
+
+        console.log("API saved items response:", savedItems);
+        return savedItems;
       } catch (error) {
         // If API fails, fetch items individually using stored IDs
         console.warn('Failed to fetch saved items from API, fetching by IDs:', error);
@@ -671,6 +714,12 @@ export const api = {
           },
         });
         const data = await handleResponse(response);
+
+        const ids = getLocalSavedItemIds();
+        if (!ids.includes(itemId)) {
+          setLocalSavedItemIds([...ids, itemId]);
+        }
+
         console.log("Item saved via API:", itemId);
         return data;
       } catch (error) {
@@ -697,6 +746,10 @@ export const api = {
           },
         });
         const data = await handleResponse(response);
+
+        const ids = getLocalSavedItemIds().filter((id) => id !== itemId);
+        setLocalSavedItemIds(ids);
+
         console.log("Item unsaved via API:", itemId);
         return data;
       } catch (error) {

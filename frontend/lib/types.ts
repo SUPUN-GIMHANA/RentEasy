@@ -10,6 +10,9 @@ export interface Item {
   available: boolean
   availableDates: string[]
   location?: string
+  latitude?: number
+  longitude?: number
+  distanceKm?: number
   minimumRentalPeriod?: number
   maximumRentalPeriod?: number
   ownerPhoneNumber?: string

@@ -7,6 +7,7 @@ import com.renteasy.repository.ItemRepository;
 import com.renteasy.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -19,7 +20,9 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -46,6 +49,8 @@ public class ItemService {
         item.setAvailable(request.getAvailable());
         item.setAvailableDates(request.getAvailableDates());
         item.setLocation(request.getLocation());
+        item.setLatitude(request.getLatitude());
+        item.setLongitude(request.getLongitude());
         item.setOwnerPhoneNumber(resolveOwnerPhoneNumber(request.getOwnerPhoneNumber(), owner));
         item.setMinimumRentalPeriod(request.getMinimumRentalPeriod());
         item.setMaximumRentalPeriod(request.getMaximumRentalPeriod());
@@ -107,6 +112,8 @@ public class ItemService {
         item.setAvailable(request.getAvailable());
         item.setAvailableDates(request.getAvailableDates());
         item.setLocation(request.getLocation());
+        item.setLatitude(request.getLatitude());
+        item.setLongitude(request.getLongitude());
         item.setOwnerPhoneNumber(resolveOwnerPhoneNumber(request.getOwnerPhoneNumber(), item.getOwner()));
         item.setMinimumRentalPeriod(request.getMinimumRentalPeriod());
         item.setMaximumRentalPeriod(request.getMaximumRentalPeriod());
@@ -188,6 +195,12 @@ public class ItemService {
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
         return itemRepository.searchItems(searchTerm, pageable);
     }
+
+    @Transactional(readOnly = true)
+    public Page<Item> searchItemsByLocation(String location, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        return itemRepository.searchItemsByLocation(location, pageable);
+    }
     
     @Transactional(readOnly = true)
     public List<Item> getBoostedItems(int limit) {
@@ -204,6 +217,59 @@ public class ItemService {
     @Transactional(readOnly = true)
     public List<Item> getUserItems(String userId) {
         return itemRepository.findByOwnerId(userId);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<Item> getNearbyItems(double latitude, double longitude, double radiusKm, int page, int size) {
+        if (radiusKm <= 0) {
+            throw new RuntimeException("Radius must be greater than 0");
+        }
+
+        List<Item> nearby = itemRepository.findByAvailableTrueAndLatitudeIsNotNullAndLongitudeIsNotNull()
+            .stream()
+            .filter(item -> {
+                double distance = calculateDistanceKm(latitude, longitude, item.getLatitude(), item.getLongitude());
+                return distance <= radiusKm;
+            })
+            .collect(Collectors.toList());
+
+        nearby.sort((a, b) -> {
+            double distanceA = calculateDistanceKm(latitude, longitude, a.getLatitude(), a.getLongitude());
+            double distanceB = calculateDistanceKm(latitude, longitude, b.getLatitude(), b.getLongitude());
+            return Double.compare(distanceA, distanceB);
+        });
+
+        int safePage = Math.max(page, 0);
+        int safeSize = Math.max(size, 1);
+        int fromIndex = safePage * safeSize;
+        if (fromIndex >= nearby.size()) {
+            return new PageImpl<>(List.of(), PageRequest.of(safePage, safeSize), nearby.size());
+        }
+
+        int toIndex = Math.min(fromIndex + safeSize, nearby.size());
+        return new PageImpl<>(nearby.subList(fromIndex, toIndex), PageRequest.of(safePage, safeSize), nearby.size());
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, Double> getDistancesByItemId(double latitude, double longitude, List<Item> items) {
+        return items.stream().collect(Collectors.toMap(
+            Item::getId,
+            item -> calculateDistanceKm(latitude, longitude, item.getLatitude(), item.getLongitude())
+        ));
+    }
+
+    private double calculateDistanceKm(double fromLat, double fromLng, double toLat, double toLng) {
+        final double earthRadiusKm = 6371.0;
+
+        double dLat = Math.toRadians(toLat - fromLat);
+        double dLng = Math.toRadians(toLng - fromLng);
+
+        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+            + Math.cos(Math.toRadians(fromLat)) * Math.cos(Math.toRadians(toLat))
+            * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+        return earthRadiusKm * c;
     }
     
     @Transactional

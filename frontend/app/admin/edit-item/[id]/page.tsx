@@ -14,6 +14,7 @@ import Image from "next/image"
 import { useRouter, useParams } from "next/navigation"
 import { api } from "@/lib/api-client"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { LocationSelector } from "@/components/location-selector"
 
 const SUBCATEGORIES: Record<string, string[]> = {
   vehicles: ["Cars", "Motorbikes", "Bicycles", "Trucks/Lorries"],
@@ -39,6 +40,8 @@ export default function EditItemPage() {
     subcategory: "",
     price: "",
     location: "",
+    latitude: null as number | null,
+    longitude: null as number | null,
     description: "",
     availableFrom: "",
     availableTo: "",
@@ -71,6 +74,8 @@ export default function EditItemPage() {
           subcategory: item.subcategory || "",
           price: String(item.price || ""),
           location: item.location || "",
+          latitude: typeof item.latitude === "number" ? item.latitude : null,
+          longitude: typeof item.longitude === "number" ? item.longitude : null,
           description: item.description || "",
           availableFrom: "",
           availableTo: "",
@@ -166,6 +171,8 @@ export default function EditItemPage() {
       subcategory: formData.subcategory,
       price: parseInt(formData.price),
       location: formData.location,
+      latitude: formData.latitude ?? undefined,
+      longitude: formData.longitude ?? undefined,
       description: formData.description,
       available: true,
       imageUrl: uploadedImages[0] || "/placeholder.svg",
@@ -292,14 +299,32 @@ export default function EditItemPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="location">Location *</Label>
-                <Input
-                  id="location"
-                  name="location"
-                  placeholder="Colombo"
-                  value={formData.location}
-                  onChange={handleInputChange}
-                  required
-                />
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="location"
+                    name="location"
+                    placeholder="Colombo"
+                    value={formData.location}
+                    onChange={handleInputChange}
+                    required
+                  />
+                  <LocationSelector
+                    value={formData.location}
+                    onChange={(location) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        location,
+                      }))
+                    }
+                    onCoordinatesChange={(coordinates) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        latitude: coordinates?.lat ?? null,
+                        longitude: coordinates?.lng ?? null,
+                      }))
+                    }
+                  />
+                </div>
               </div>
             </div>
 

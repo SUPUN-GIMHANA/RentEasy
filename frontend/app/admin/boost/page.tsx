@@ -6,10 +6,10 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Zap, TrendingUp, Eye, AlertCircle } from "lucide-react"
 import Image from "next/image"
-import Link from "next/link"
 import { useSearchParams } from "next/navigation"
-import BoostSelectionModal from "@/components/BoostSelectionModal"
-import BoostPaymentModal from "@/components/BoostPaymentModal"
+import { BoostSelectionModal } from "@/components/boost-selection-modal"
+import { BoostPaymentModal } from "@/components/boost-payment-modal"
+import { api } from "@/lib/api-client"
 
 const boostPlans = [
   {
@@ -47,70 +47,63 @@ const boostPlans = [
   },
 ]
 
-const initialActiveBoosts = [
-  {
-    id: "1",
-    name: "Professional Camera Kit",
-    plan: "Premium Boost",
-    daysLeft: 4,
-    image: "/professional-camera-kit.jpg",
-  },
-  {
-    id: "2",
-    name: "Luxury Camping Tent",
-    plan: "Basic Boost",
-    daysLeft: 1,
-    image: "/luxury-camping-tent-setup.jpg",
-  },
-]
+interface OwnerItem {
+  id: string
+  name: string
+  category: string
+  price: number
+  imageUrl?: string
+  boosted?: boolean
+  boostedUntil?: string
+}
 
-const initialAvailableItems = [
-  {
-    id: "3",
-    name: "DJ Sound System",
-    category: "Events",
-    price: 12000,
-    image: "/professional-dj-sound-system.jpg",
-  },
-  {
-    id: "4",
-    name: "Mountain Bike",
-    category: "Sports",
-    price: 2000,
-    image: "/mountain-bike-adventure.jpg",
-  },
-]
+interface ActiveBoost {
+  id: string
+  name: string
+  plan: string
+  daysLeft: number
+  image: string
+}
 
 export default function BoostAdvertisementPage() {
   const searchParams = useSearchParams()
-  const [activeBoosts, setActiveBoosts] = useState(initialActiveBoosts)
-  const [availableItems, setAvailableItems] = useState(initialAvailableItems)
+  const [items, setItems] = useState<OwnerItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [isSubmittingBoost, setIsSubmittingBoost] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
-  const [selectedItem, setSelectedItem] = useState<any | null>(null)
-  const [selectedPlan, setSelectedPlan] = useState<any | null>(null)
+  const [selectedItem, setSelectedItem] = useState<OwnerItem | null>(null)
+  const [selectedPlan, setSelectedPlan] = useState<{ id: string; name: string; price: number } | null>(null)
   const [selectedBoostModal, setSelectedBoostModal] = useState(false)
   const [paymentModal, setPaymentModal] = useState(false)
 
-  // Load added items from localStorage (run once on mount)
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const addedItems = JSON.parse(localStorage.getItem("rentalItems") || "[]")
-      if (addedItems.length > 0) {
-        // Add newly created items to available items, avoiding duplicates
-        setAvailableItems((prev) => {
-          const existingIds = new Set(prev.map((item) => item.id))
-          const initialIds = new Set(initialAvailableItems.map((item) => item.id))
-          
-          const newItems = addedItems.filter(
-            (item: any) => !existingIds.has(item.id) && !initialIds.has(item.id)
-          )
-          return [...prev, ...newItems]
-        })
-      }
+  const loadItems = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      const response = await api.items.getMyItems()
+      const normalized: OwnerItem[] = (response || []).map((item: any) => ({
+        id: item.id,
+        name: item.name,
+        category: item.category,
+        price: Number(item.price || 0),
+        imageUrl: item.imageUrl,
+        boosted: Boolean(item.boosted),
+        boostedUntil: item.boostedUntil,
+      }))
+      setItems(normalized)
+    } catch (e) {
+      setError("Failed to load your items")
+      setItems([])
+    } finally {
+      setLoading(false)
     }
+  }
+
+  useEffect(() => {
+    loadItems()
   }, [])
 
-  // Check for success message from searchParams
   useEffect(() => {
     if (searchParams.get("success")) {
       setSuccessMessage("Boost activated successfully!")
@@ -118,30 +111,85 @@ export default function BoostAdvertisementPage() {
     }
   }, [searchParams])
 
-  const handleBoostItem = (item: any) => {
+  const planDurationDaysById: Record<string, number> = {
+    basic: 3,
+    premium: 7,
+    ultimate: 14,
+  }
+
+  const now = new Date()
+  const activeBoosts: ActiveBoost[] = items
+    .filter((item) => {
+      if (!item.boosted || !item.boostedUntil) {
+        return false
+      }
+      const boostedUntilDate = new Date(item.boostedUntil)
+      return boostedUntilDate.getTime() > now.getTime()
+    })
+    .map((item) => {
+      const boostedUntilDate = new Date(item.boostedUntil as string)
+      const msLeft = boostedUntilDate.getTime() - now.getTime()
+      const daysLeft = Math.max(1, Math.ceil(msLeft / (1000 * 60 * 60 * 24)))
+
+      let plan = "Active Boost"
+      if (daysLeft <= 3) {
+        plan = "Basic Boost"
+      } else if (daysLeft <= 7) {
+        plan = "Premium Boost"
+      } else {
+        plan = "Ultimate Boost"
+      }
+
+      return {
+        id: item.id,
+        name: item.name,
+        plan,
+        daysLeft,
+        image: item.imageUrl || "/placeholder.svg",
+      }
+    })
+
+  const availableItems = items.filter((item) => {
+    if (!item.boosted || !item.boostedUntil) {
+      return true
+    }
+    return new Date(item.boostedUntil).getTime() <= now.getTime()
+  })
+
+  const handleBoostItem = (item: OwnerItem) => {
     setSelectedItem(item)
     setSelectedBoostModal(true)
   }
 
-  const handleSelectPlan = (plan: any) => {
-    setSelectedPlan(plan)
+  const handleSelectPlan = (planId: string, planName: string, price: number) => {
+    setSelectedPlan({ id: planId, name: planName, price })
     setPaymentModal(true)
   }
 
-  const handlePaymentSuccess = () => {
-    setActiveBoosts((prev) => [
-      ...prev,
-      {
-        id: Date.now().toString(),
-        name: selectedItem?.name || "",
-        plan: selectedPlan?.name || "",
-        daysLeft: parseInt(selectedPlan?.duration.replace(" days", "")),
-        image: selectedItem?.image || "",
-      },
-    ])
-    setSelectedItem(null)
-    setSelectedPlan(null)
-    setPaymentModal(false)
+  const handlePaymentSuccess = async () => {
+    if (!selectedItem || !selectedPlan) {
+      return
+    }
+
+    try {
+      setIsSubmittingBoost(true)
+      setError(null)
+
+      const durationDays = planDurationDaysById[selectedPlan.id] || 3
+      await api.items.boost(selectedItem.id, durationDays)
+      await loadItems()
+
+      setSuccessMessage(`Boost activated for ${selectedItem.name}`)
+      setTimeout(() => setSuccessMessage(null), 5000)
+
+      setSelectedItem(null)
+      setSelectedPlan(null)
+      setPaymentModal(false)
+    } catch (e) {
+      setError("Failed to activate boost. Please try again.")
+    } finally {
+      setIsSubmittingBoost(false)
+    }
   }
 
   return (
@@ -161,9 +209,22 @@ export default function BoostAdvertisementPage() {
         </p>
       </div>
 
+      {error && (
+        <Card className="bg-red-50 border-red-200">
+          <CardContent className="p-4 flex items-center gap-4">
+            <AlertCircle className="h-5 w-5 text-red-600" />
+            <p className="text-red-900 font-medium">{error}</p>
+          </CardContent>
+        </Card>
+      )}
+
       <div>
         <h2 className="text-xl font-semibold mb-4">Active Boosts</h2>
-        {activeBoosts.length === 0 ? (
+        {loading ? (
+          <Card>
+            <CardContent className="p-6 text-sm text-muted-foreground">Loading boosts...</CardContent>
+          </Card>
+        ) : activeBoosts.length === 0 ? (
           <Card className="bg-blue-50 border-blue-200">
             <CardContent className="p-6 flex items-center gap-4">
               <AlertCircle className="h-5 w-5 text-blue-600" />
@@ -184,7 +245,7 @@ export default function BoostAdvertisementPage() {
               >
                 <CardContent className="p-4">
                   <div className="flex items-center gap-4">
-                    <div className="relative h-16 w-16 rounded-lg overflow-hidden flex-shrink-0">
+                    <div className="relative h-16 w-16 rounded-lg overflow-hidden shrink-0">
                       <Image
                         src={boost.image || "/placeholder.svg"}
                         alt={boost.name}
@@ -198,11 +259,11 @@ export default function BoostAdvertisementPage() {
                         {boost.plan}
                       </p>
                     </div>
-                    <Badge className="bg-gradient-to-r from-yellow-400 to-orange-500">
+                    <Badge className="bg-linear-to-r from-yellow-400 to-orange-500">
                       <Zap className="h-3 w-3 mr-1" />
                       {boost.daysLeft} days left
                     </Badge>
-                    <Button variant="outline" size="sm">
+                    <Button variant="outline" size="sm" onClick={() => handleBoostItem(items.find((i) => i.id === boost.id) as OwnerItem)}>
                       Extend
                     </Button>
                   </div>
@@ -215,7 +276,11 @@ export default function BoostAdvertisementPage() {
 
       <div>
         <h2 className="text-xl font-semibold mb-4">Available Items to Boost</h2>
-        {availableItems.length === 0 ? (
+        {loading ? (
+          <Card>
+            <CardContent className="p-6 text-sm text-muted-foreground">Loading items...</CardContent>
+          </Card>
+        ) : availableItems.length === 0 ? (
           <Card className="bg-blue-50 border-blue-200">
             <CardContent className="p-6">
               <p className="text-blue-900">
@@ -230,7 +295,7 @@ export default function BoostAdvertisementPage() {
               <Card key={item.id} className="overflow-hidden hover:shadow-lg transition-all">
                 <div className="relative h-32 w-full">
                   <Image
-                    src={item.image || "/placeholder.svg"}
+                    src={item.imageUrl || "/placeholder.svg"}
                     alt={item.name}
                     fill
                     className="object-cover"
@@ -241,12 +306,10 @@ export default function BoostAdvertisementPage() {
                   <p className="text-sm text-muted-foreground mb-4">
                     {item.category}
                   </p>
-                  <Link href={`/admin/boost/select-plan?itemId=${item.id}`}>
-                    <Button className="w-full bg-[#2B70FF] hover:bg-[#1A4FCC]">
-                      <Zap className="h-4 w-4 mr-2" />
-                      Boost This Item
-                    </Button>
-                  </Link>
+                  <Button className="w-full bg-[#2B70FF] hover:bg-[#1A4FCC]" onClick={() => handleBoostItem(item)}>
+                    <Zap className="h-4 w-4 mr-2" />
+                    Boost This Item
+                  </Button>
                 </CardContent>
               </Card>
             ))}
@@ -254,10 +317,10 @@ export default function BoostAdvertisementPage() {
         )}
       </div>
 
-      <Card className="bg-gradient-to-br from-blue-50 to-cyan-50">
+      <Card className="bg-linear-to-br from-blue-50 to-cyan-50">
         <CardContent className="p-6">
           <div className="flex items-start gap-4">
-            <div className="h-12 w-12 rounded-lg bg-[#2B70FF] flex items-center justify-center flex-shrink-0">
+            <div className="h-12 w-12 rounded-lg bg-[#2B70FF] flex items-center justify-center shrink-0">
               <TrendingUp className="h-6 w-6 text-white" />
             </div>
             <div className="flex-1">
@@ -283,7 +346,27 @@ export default function BoostAdvertisementPage() {
         </CardContent>
       </Card>
 
+      <BoostSelectionModal
+        open={selectedBoostModal}
+        onOpenChange={setSelectedBoostModal}
+        itemName={selectedItem?.name || ""}
+        itemImage={selectedItem?.imageUrl || "/placeholder.svg"}
+        plans={boostPlans}
+        onSelectPlan={handleSelectPlan}
+      />
 
+      <BoostPaymentModal
+        open={paymentModal}
+        onOpenChange={(open) => {
+          if (!isSubmittingBoost) {
+            setPaymentModal(open)
+          }
+        }}
+        itemName={selectedItem?.name || ""}
+        planName={selectedPlan?.name || ""}
+        amount={selectedPlan?.price || 0}
+        onPaymentSuccess={handlePaymentSuccess}
+      />
     </div>
   )
 }

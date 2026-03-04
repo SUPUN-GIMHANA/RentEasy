@@ -25,6 +25,9 @@ public class ItemDTO {
     private Boolean available;
     private List<String> availableDates;
     private String location;
+    private Double latitude;
+    private Double longitude;
+    private Double distanceKm;
     private Integer minimumRentalPeriod;
     private Integer maximumRentalPeriod;
     private String ownerPhoneNumber;

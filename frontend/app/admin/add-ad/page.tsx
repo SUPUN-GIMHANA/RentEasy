@@ -14,6 +14,7 @@ import { api } from "@/lib/api-client"
 import { useAuth } from "@/lib/auth-context"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Calendar } from "@/components/ui/calendar"
+import { LocationSelector } from "@/components/location-selector"
 
 const SUBCATEGORIES: Record<string, string[]> = {
   vehicles: ["Cars", "Motorbikes", "Bicycles", "Trucks/Lorries"],
@@ -35,6 +36,8 @@ export default function AddAdvertisementPage() {
     subcategory: "",
     price: "",
     location: "",
+    latitude: null as number | null,
+    longitude: null as number | null,
     ownerPhoneNumber: "",
     description: "",
   })
@@ -132,6 +135,8 @@ export default function AddAdvertisementPage() {
         subcategory: formData.subcategory,
         price: parseFloat(formData.price),
         location: formData.location,
+        latitude: formData.latitude ?? undefined,
+        longitude: formData.longitude ?? undefined,
         ownerPhoneNumber: formData.ownerPhoneNumber,
         description: formData.description,
         availableDates: availableDates.map((date) => {
@@ -249,14 +254,32 @@ export default function AddAdvertisementPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="location">Location *</Label>
-                <Input
-                  id="location"
-                  name="location"
-                  placeholder="Colombo"
-                  value={formData.location}
-                  onChange={handleInputChange}
-                  required
-                />
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="location"
+                    name="location"
+                    placeholder="Colombo"
+                    value={formData.location}
+                    onChange={handleInputChange}
+                    required
+                  />
+                  <LocationSelector
+                    value={formData.location}
+                    onChange={(location) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        location,
+                      }))
+                    }
+                    onCoordinatesChange={(coordinates) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        latitude: coordinates?.lat ?? null,
+                        longitude: coordinates?.lng ?? null,
+                      }))
+                    }
+                  />
+                </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="ownerPhoneNumber">Mobile Number *</Label>
