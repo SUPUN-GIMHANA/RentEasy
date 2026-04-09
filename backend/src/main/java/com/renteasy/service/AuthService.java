@@ -6,6 +6,7 @@ import com.renteasy.dto.JwtResponse;
 import com.renteasy.model.User;
 import com.renteasy.repository.UserRepository;
 import com.renteasy.security.JwtTokenProvider;
+import com.renteasy.util.InputSanitizer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -26,19 +27,21 @@ public class AuthService {
     
     @Transactional
     public User registerUser(SignupRequest signupRequest) {
-        if (userRepository.existsByEmail(signupRequest.getEmail())) {
+        String email = InputSanitizer.normalizeEmail(signupRequest.getEmail());
+
+        if (userRepository.existsByEmail(email)) {
             throw new RuntimeException("Email is already taken!");
         }
         
         User user = new User();
-        user.setEmail(signupRequest.getEmail());
+        user.setEmail(email);
         user.setPassword(passwordEncoder.encode(signupRequest.getPassword()));
-        user.setFirstName(signupRequest.getFirstName());
-        user.setLastName(signupRequest.getLastName());
-        user.setPhoneNumber(signupRequest.getPhoneNumber());
-        user.setAddress(signupRequest.getAddress());
-        user.setCity(signupRequest.getCity());
-        user.setCountry(signupRequest.getCountry());
+        user.setFirstName(InputSanitizer.sanitizeRequired(signupRequest.getFirstName(), "First name"));
+        user.setLastName(InputSanitizer.sanitizeRequired(signupRequest.getLastName(), "Last name"));
+        user.setPhoneNumber(InputSanitizer.sanitizeNullable(signupRequest.getPhoneNumber()));
+        user.setAddress(InputSanitizer.sanitizeNullable(signupRequest.getAddress()));
+        user.setCity(InputSanitizer.sanitizeNullable(signupRequest.getCity()));
+        user.setCountry(InputSanitizer.sanitizeNullable(signupRequest.getCountry()));
         user.setRole(User.Role.USER);
         user.setActive(true);
         
@@ -46,9 +49,11 @@ public class AuthService {
     }
     
     public JwtResponse authenticateUser(LoginRequest loginRequest) {
+        String normalizedEmail = InputSanitizer.normalizeEmail(loginRequest.getEmail());
+
         Authentication authentication = authenticationManager.authenticate(
             new UsernamePasswordAuthenticationToken(
-                loginRequest.getEmail(),
+                normalizedEmail,
                 loginRequest.getPassword()
             )
         );
@@ -57,7 +62,7 @@ public class AuthService {
         
         String jwt = tokenProvider.generateToken(authentication);
         
-        User user = userRepository.findByEmail(loginRequest.getEmail())
+        User user = userRepository.findByEmail(normalizedEmail)
             .orElseThrow(() -> new RuntimeException("User not found"));
         
         return new JwtResponse(

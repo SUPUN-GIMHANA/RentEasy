@@ -15,6 +15,7 @@ import { useRouter } from "next/navigation"
 import { api } from "@/lib/api-client"
 import { useAuth } from "@/lib/auth-context"
 import { safeJsonParse } from "@/lib/utils"
+import { shouldBypassImageOptimization } from "@/lib/image-utils"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Calendar } from "@/components/ui/calendar"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -401,7 +402,7 @@ export default function AddItemPage() {
                   {imagePreview.map((image, index) => (
                     <div key={index} className="relative group">
                       <div className="relative h-24 w-full rounded-lg overflow-hidden bg-gray-100">
-                        <Image src={image || "/placeholder.svg"} alt={`Preview ${index}`} fill className="object-cover" />
+                        <Image src={image || "/placeholder.svg"} alt={`Preview ${index}`} fill className="object-cover" unoptimized={shouldBypassImageOptimization(image)} />
                       </div>
                       <button
                         type="button"

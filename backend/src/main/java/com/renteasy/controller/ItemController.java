@@ -198,15 +198,12 @@ public class ItemController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "12") int size,
             @RequestParam(required = false) String subcategory) {
-        System.out.println("ItemController.getItemsByCategory called with category='" + category + "', subcategory='" + subcategory + "', page=" + page);
         Page<Item> items;
         String trimmedCategory = category.trim();
         if (subcategory != null && !subcategory.trim().isEmpty()) {
             String trimmedSubcategory = subcategory.trim();
-            System.out.println("Filtering by category AND subcategory: '" + trimmedSubcategory + "'");
             items = itemService.getItemsByCategoryAndSubcategory(trimmedCategory, trimmedSubcategory, page, size);
         } else {
-            System.out.println("Filtering by category only");
             items = itemService.getItemsByCategory(trimmedCategory, page, size);
         }
         return ResponseEntity.ok(items.map(this::convertToDTO));
@@ -253,30 +250,38 @@ public class ItemController {
     }
     
     @GetMapping("/boosted")
-    public ResponseEntity<List<ItemDTO>> getBoostedItems(
-            @RequestParam(defaultValue = "10") int limit) {
-        List<Item> items = itemService.getBoostedItems(limit);
-        return ResponseEntity.ok(items.stream().map(this::convertToDTO).collect(Collectors.toList()));
+    public ResponseEntity<Page<ItemDTO>> getBoostedItems(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "12") int size) {
+        Page<Item> items = itemService.getBoostedItems(page, size);
+        return ResponseEntity.ok(items.map(this::convertToDTO));
     }
     
     @GetMapping("/popular")
-    public ResponseEntity<List<ItemDTO>> getPopularItems(
-            @RequestParam(defaultValue = "10") int limit) {
-        List<Item> items = itemService.getPopularItems(limit);
-        return ResponseEntity.ok(items.stream().map(this::convertToDTO).collect(Collectors.toList()));
+    public ResponseEntity<Page<ItemDTO>> getPopularItems(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "12") int size) {
+        Page<Item> items = itemService.getPopularItems(page, size);
+        return ResponseEntity.ok(items.map(this::convertToDTO));
     }
     
     @GetMapping("/user/{userId}")
-    public ResponseEntity<List<ItemDTO>> getUserItems(@PathVariable String userId) {
-        List<Item> items = itemService.getUserItems(userId);
-        return ResponseEntity.ok(items.stream().map(this::convertToDTO).collect(Collectors.toList()));
+    public ResponseEntity<Page<ItemDTO>> getUserItems(
+            @PathVariable String userId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "12") int size) {
+        Page<Item> items = itemService.getUserItems(userId, page, size);
+        return ResponseEntity.ok(items.map(this::convertToDTO));
     }
     
     @GetMapping("/my-items")
-    public ResponseEntity<List<ItemDTO>> getMyItems(Authentication authentication) {
+    public ResponseEntity<Page<ItemDTO>> getMyItems(
+            Authentication authentication,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "12") int size) {
         String userId = getUserIdFromAuthentication(authentication);
-        List<Item> items = itemService.getUserItems(userId);
-        return ResponseEntity.ok(items.stream().map(this::convertToDTO).collect(Collectors.toList()));
+        Page<Item> items = itemService.getUserItems(userId, page, size);
+        return ResponseEntity.ok(items.map(this::convertToDTO));
     }
 
     @PatchMapping("/{id}/booking-dates")

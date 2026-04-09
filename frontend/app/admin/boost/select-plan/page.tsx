@@ -8,6 +8,7 @@ import { Zap } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Image from "next/image"
 import { api } from "@/lib/api-client"
+import { shouldBypassImageOptimization } from "@/lib/image-utils"
 
 const boostPlans = [
   {
@@ -116,6 +117,7 @@ export default function SelectPlanPage() {
                 alt={selectedItem.name}
                 fill
                 className="object-cover"
+                unoptimized={shouldBypassImageOptimization(selectedItem.imageUrl || selectedItem.image)}
               />
             </div>
             <div>

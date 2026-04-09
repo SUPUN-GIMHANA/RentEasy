@@ -7,6 +7,7 @@ import com.renteasy.model.User;
 import com.renteasy.repository.BookingRepository;
 import com.renteasy.repository.ItemRepository;
 import com.renteasy.repository.UserRepository;
+import com.renteasy.util.InputSanitizer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -60,8 +61,8 @@ public class BookingService {
         booking.setEndDate(request.getEndDate());
         booking.setRentalDays((int) rentalDays);
         booking.setTotalPrice(totalPrice);
-        booking.setDeliveryAddress(request.getDeliveryAddress());
-        booking.setSpecialInstructions(request.getSpecialInstructions());
+        booking.setDeliveryAddress(InputSanitizer.sanitizeNullable(request.getDeliveryAddress()));
+        booking.setSpecialInstructions(InputSanitizer.sanitizeNullable(request.getSpecialInstructions()));
         booking.setStatus(Booking.BookingStatus.PENDING);
         
         Booking savedBooking = bookingRepository.save(booking);

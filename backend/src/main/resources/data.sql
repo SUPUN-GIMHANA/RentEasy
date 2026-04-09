@@ -1,9 +1,9 @@
 -- Initial data for testing
 INSERT INTO users (id, email, password, first_name, last_name, role, active, email_verified, created_at, updated_at) 
 VALUES 
-('admin-001', 'admin@renteasy.com', '$2a$10$YourHashedPasswordHere', 'Admin', 'User', 'ADMIN', true, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-('user-001', 'john@example.com', '$2a$10$YourHashedPasswordHere', 'John', 'Doe', 'USER', true, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-('anon-user', 'anonymous@renteasy.local', 'anonymous', 'Anonymous', 'User', 'USER', true, false, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+('admin-001', 'admin@renteasy.com', '$2a$12$YourBcryptHashPlaceholderUseStrongValueInRealEnv0000000', 'Admin', 'User', 'ADMIN', true, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('user-001', 'john@example.com', '$2a$12$YourBcryptHashPlaceholderUseStrongValueInRealEnv0000000', 'John', 'Doe', 'USER', true, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('anon-user', 'anonymous@renteasy.local', '$2a$12$YourBcryptHashPlaceholderUseStrongValueInRealEnv0000000', 'Anonymous', 'User', 'USER', true, false, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 -- Sample Items with Categories and Subcategories
 

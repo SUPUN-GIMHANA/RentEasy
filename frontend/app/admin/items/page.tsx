@@ -14,6 +14,7 @@ import { useAuth } from "@/lib/auth-context"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { getActiveOfferForItem, getStoredOffers, type StoredOffer } from "@/lib/offer-utils"
 import { safeJsonParse } from "@/lib/utils"
+import { shouldBypassImageOptimization } from "@/lib/image-utils"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -69,6 +70,18 @@ export default function ManageItemsPage() {
       setLoading(true)
       setError("")
 
+      const extractItemsArray = (raw: unknown): any[] => {
+        if (Array.isArray(raw)) {
+          return raw
+        }
+
+        if (raw && typeof raw === "object" && Array.isArray((raw as { content?: unknown[] }).content)) {
+          return (raw as { content: unknown[] }).content
+        }
+
+        return []
+      }
+
       const normalizeItems = (rawItems: any[]): Item[] => {
         return (rawItems || []).map((item) => ({
           id: item.id,
@@ -91,31 +104,12 @@ export default function ManageItemsPage() {
         }))
       }
 
-      const myItemsResponse = await api.items.getMyItems().catch(() => [])
-      let normalizedItems = normalizeItems(myItemsResponse || [])
-
-      if (normalizedItems.length === 0) {
-        const allItemsResponse = await api.items.getAll(0, 200).catch(() => ({ content: [] }))
-        const allItems = normalizeItems(allItemsResponse?.content || allItemsResponse || [])
-
-        if (user?.id) {
-          normalizedItems = allItems.filter((item) => item.ownerId === user.id)
-        }
-
-        if (normalizedItems.length === 0 && typeof window !== "undefined") {
-          const createdItemsKey = user?.id ? `myCreatedItemIds:${user.id}` : "myCreatedItemIds"
-          const createdIds = safeJsonParse<string[]>(localStorage.getItem(createdItemsKey), [])
-          if (createdIds.length > 0) {
-            const createdIdSet = new Set(createdIds)
-            normalizedItems = allItems.filter((item) => createdIdSet.has(item.id))
-          }
-        }
-      }
-
+      const myItemsResponse = await api.items.getMyItems()
+      const normalizedItems = normalizeItems(extractItemsArray(myItemsResponse))
       setItems(normalizedItems)
     } catch (err) {
       console.error("Failed to load items:", err)
-      setError("Failed to load items")
+      setError("Failed to load your items. Please sign in again and retry.")
       setItems([])
     } finally {
       setLoading(false)
@@ -317,6 +311,8 @@ export default function ManageItemsPage() {
                         alt={item.name}
                         fill
                         className="object-cover"
+                        sizes="80px"
+                        unoptimized={shouldBypassImageOptimization(item.imageUrl)}
                       />
                     )}
                   </div>

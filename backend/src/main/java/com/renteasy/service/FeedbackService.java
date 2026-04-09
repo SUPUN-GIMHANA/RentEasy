@@ -7,6 +7,7 @@ import com.renteasy.model.User;
 import com.renteasy.repository.BookingRepository;
 import com.renteasy.repository.FeedbackRepository;
 import com.renteasy.repository.UserRepository;
+import com.renteasy.util.InputSanitizer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -48,7 +49,7 @@ public class FeedbackService {
         feedback.setBooking(booking);
         feedback.setUser(user);
         feedback.setRating(request.getRating());
-        feedback.setComment(request.getComment());
+        feedback.setComment(InputSanitizer.sanitizeNullable(request.getComment()));
         
         return feedbackRepository.save(feedback);
     }

@@ -22,6 +22,10 @@
         "name": "next"
       }
     ],
+    "types": [
+      "jest",
+      "node"
+    ],
     "paths": {
       "@/*": [
         "./*"
@@ -36,6 +40,11 @@
     ".next/dev/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "__tests__/**/*",
+    "e2e/**/*",
+    "jest.config.ts",
+    "jest.setup.ts",
+    "playwright.config.ts"
   ]
 }

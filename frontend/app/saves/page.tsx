@@ -12,6 +12,7 @@ import { Heart, MapPin, Star } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
 import { api } from "@/lib/api-client"
+import { shouldBypassImageOptimization } from "@/lib/image-utils"
 
 interface SavedItem {
   id: string
@@ -107,7 +108,7 @@ export default function SavesPage() {
                   className="overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-1"
                 >
                   <div className="relative h-48">
-                    <Image src={item.imageUrl || "/placeholder.svg"} alt={item.name} fill className="object-cover" />
+                    <Image src={item.imageUrl || "/placeholder.svg"} alt={item.name} fill className="object-cover" unoptimized={shouldBypassImageOptimization(item.imageUrl)} />
                     <Button
                       size="icon"
                       variant="secondary"

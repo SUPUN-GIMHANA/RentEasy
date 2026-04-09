@@ -4,6 +4,7 @@ import com.renteasy.dto.AdvertisementRequest;
 import com.renteasy.dto.ApiResponse;
 import com.renteasy.model.Advertisement;
 import com.renteasy.repository.AdvertisementRepository;
+import com.renteasy.util.InputSanitizer;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -44,10 +45,10 @@ public class AdvertisementController {
     public ResponseEntity<?> createAdvertisement(@Valid @RequestBody AdvertisementRequest request) {
         try {
             Advertisement advertisement = new Advertisement();
-            advertisement.setTitle(request.getTitle());
-            advertisement.setDescription(request.getDescription());
-            advertisement.setImageUrl(request.getImageUrl());
-            advertisement.setLinkUrl(request.getLinkUrl());
+            advertisement.setTitle(InputSanitizer.sanitizeRequired(request.getTitle(), "Title"));
+            advertisement.setDescription(InputSanitizer.sanitizeNullable(request.getDescription()));
+            advertisement.setImageUrl(InputSanitizer.sanitizeNullable(request.getImageUrl()));
+            advertisement.setLinkUrl(InputSanitizer.sanitizeNullable(request.getLinkUrl()));
             advertisement.setPosition(request.getPosition());
             advertisement.setActive(request.getActive() != null ? request.getActive() : true);
             advertisement.setStartDate(request.getStartDate());

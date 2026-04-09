@@ -8,6 +8,7 @@ import { TrendingUp, TrendingDown, Eye, Zap, DollarSign, ShoppingBag, PlusCircle
 import Image from "next/image"
 import { api } from "@/lib/api-client"
 import { useAuth } from "@/lib/auth-context"
+import { shouldBypassImageOptimization } from "@/lib/image-utils"
 
 type DashboardItem = {
   id: string
@@ -65,6 +66,18 @@ export default function AdminDashboard() {
         setLoading(true)
         setError("")
 
+        const extractItemsArray = (raw: unknown): any[] => {
+          if (Array.isArray(raw)) {
+            return raw
+          }
+
+          if (raw && typeof raw === "object" && Array.isArray((raw as { content?: unknown[] }).content)) {
+            return (raw as { content: unknown[] }).content
+          }
+
+          return []
+        }
+
         const [myItemsRes, adsRes, bookingsRes] = await Promise.allSettled([
           api.items.getMyItems(),
           api.advertisements.getAll(),
@@ -73,7 +86,7 @@ export default function AdminDashboard() {
 
         const normalizedItems: DashboardItem[] =
           myItemsRes.status === "fulfilled"
-            ? (myItemsRes.value || []).map((item: any) => ({
+            ? extractItemsArray(myItemsRes.value).map((item: any) => ({
                 id: item.id,
                 name: item.name,
                 views: Number(item.views || 0),
@@ -330,7 +343,7 @@ export default function AdminDashboard() {
                     {index + 1}
                   </div>
                   <div className="relative h-16 w-16 rounded-lg overflow-hidden shrink-0">
-                    <Image src={item.image || "/placeholder.svg"} alt={item.name} fill className="object-cover" />
+                    <Image src={item.image || "/placeholder.svg"} alt={item.name} fill className="object-cover" sizes="64px" unoptimized={shouldBypassImageOptimization(item.image)} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-medium truncate">{item.name}</p>

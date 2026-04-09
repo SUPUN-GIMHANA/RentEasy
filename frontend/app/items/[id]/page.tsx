@@ -15,6 +15,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { getActiveOfferForItem, getStoredOffers, type StoredOffer } from "@/lib/offer-utils"
+import { shouldBypassImageOptimization } from "@/lib/image-utils"
 
 export default function ItemDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
@@ -192,7 +193,7 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
           {/* Image Section */}
           <div>
             <div className="relative aspect-square rounded-lg overflow-hidden bg-muted">
-              <Image src={selectedImage || "/placeholder.svg"} alt={item.name} fill className="object-cover" />
+              <Image src={selectedImage || "/placeholder.svg"} alt={item.name} fill className="object-cover" priority sizes="(max-width: 1024px) 100vw, 50vw" unoptimized={shouldBypassImageOptimization(selectedImage)} />
             </div>
             {itemImages.length > 1 && (
               <div className="grid grid-cols-5 gap-2 mt-3">
@@ -203,7 +204,7 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
                     onClick={() => setSelectedImage(image)}
                     className={`relative aspect-square rounded-md overflow-hidden border-2 transition-colors ${selectedImage === image ? "border-primary" : "border-transparent"}`}
                   >
-                    <Image src={image || "/placeholder.svg"} alt={`${item.name} photo ${index + 1}`} fill className="object-cover" />
+                    <Image src={image || "/placeholder.svg"} alt={`${item.name} photo ${index + 1}`} fill className="object-cover" sizes="20vw" unoptimized={shouldBypassImageOptimization(image)} />
                   </button>
                 ))}
               </div>

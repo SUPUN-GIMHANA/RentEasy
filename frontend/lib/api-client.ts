@@ -278,6 +278,9 @@ export const api = {
     
     getMyItems: async () => {
       const token = getAuthToken();
+      if (!token) {
+        throw new ApiError(401, 'Please sign in to view your items.');
+      }
       const response = await fetch(`${API_BASE_URL}/items/my-items`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -359,6 +362,9 @@ export const api = {
 
     updateBookingDates: async (id: string, availableDates: string[], fallbackItemData?: any) => {
       const token = getAuthToken();
+      if (!token) {
+        throw new ApiError(401, 'Please sign in to update booking dates.');
+      }
 
       const response = await fetch(`${API_BASE_URL}/items/${id}/booking-dates`, {
         method: 'PATCH',
@@ -375,7 +381,7 @@ export const api = {
 
       // Fallback for backend builds that don't expose /booking-dates endpoint
       // or return non-standard error codes/messages for missing route.
-      if (fallbackItemData) {
+      if (fallbackItemData && (response.status === 404 || response.status === 405)) {
         const fallbackPayload = {
           name: fallbackItemData.name,
           description: fallbackItemData.description,

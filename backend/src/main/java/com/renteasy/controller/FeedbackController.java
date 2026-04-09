@@ -4,12 +4,12 @@ import com.renteasy.dto.ApiResponse;
 import com.renteasy.dto.FeedbackRequest;
 import com.renteasy.model.Feedback;
 import com.renteasy.service.FeedbackService;
+import com.renteasy.util.SecurityUtils;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -25,7 +25,7 @@ public class FeedbackController {
     public ResponseEntity<?> createFeedback(@Valid @RequestBody FeedbackRequest request,
                                            Authentication authentication) {
         try {
-            String userId = getUserIdFromAuthentication(authentication);
+            String userId = SecurityUtils.getCurrentUserId(authentication);
             Feedback feedback = feedbackService.createFeedback(request, userId);
             return ResponseEntity.status(HttpStatus.CREATED)
                 .body(new ApiResponse(true, "Feedback submitted successfully", feedback));
@@ -56,10 +56,5 @@ public class FeedbackController {
     public ResponseEntity<List<Feedback>> getUserFeedbacks(@PathVariable String userId) {
         List<Feedback> feedbacks = feedbackService.getUserFeedbacks(userId);
         return ResponseEntity.ok(feedbacks);
-    }
-    
-    private String getUserIdFromAuthentication(Authentication authentication) {
-        UserDetails userDetails = (UserDetails) authentication.getPrincipal();
-        return ((com.renteasy.security.UserPrincipal) userDetails).getId();
     }
 }

@@ -1,0 +1,112 @@
+{
+  "info": {
+    "name": "RentEasy QA CRUD",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "CRUD API regression checks with status and body assertions"
+  },
+  "item": [
+    {
+      "name": "Create Item",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{jwtToken}}" }
+        ],
+        "url": "{{baseUrl}}/api/items",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"QA Camera\",\n  \"description\": \"Created from Postman\",\n  \"category\": \"electronics\",\n  \"subcategory\": \"Cameras\",\n  \"price\": 2500,\n  \"available\": true,\n  \"location\": \"Colombo\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 201/200', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+              "const json = pm.response.json();",
+              "pm.test('Create success', function () { pm.expect(json.success).to.eql(true); });",
+              "pm.collectionVariables.set('itemId', json.data.id || json.data.data?.id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Get Item",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/items/{{itemId}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.response.to.have.status(200);",
+              "const json = pm.response.json();",
+              "pm.expect(json.id).to.eql(pm.collectionVariables.get('itemId'));",
+              "pm.expect(json.name).to.not.be.empty;"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Update Item",
+      "request": {
+        "method": "PUT",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{jwtToken}}" }
+        ],
+        "url": "{{baseUrl}}/api/items/{{itemId}}",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"QA Camera Updated\",\n  \"description\": \"Updated from Postman\",\n  \"category\": \"electronics\",\n  \"subcategory\": \"Cameras\",\n  \"price\": 3000,\n  \"available\": true,\n  \"location\": \"Kandy\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.response.to.have.status(200);",
+              "const json = pm.response.json();",
+              "pm.expect(json.success).to.eql(true);",
+              "pm.expect(json.data.name).to.eql('QA Camera Updated');"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Delete Item",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{jwtToken}}" }
+        ],
+        "url": "{{baseUrl}}/api/items/{{itemId}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.response.to.have.status(200);",
+              "const json = pm.response.json();",
+              "pm.expect(json.success).to.eql(true);"
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8081" },
+    { "key": "jwtToken", "value": "" },
+    { "key": "itemId", "value": "" }
+  ]
+}

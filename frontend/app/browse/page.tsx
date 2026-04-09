@@ -18,6 +18,7 @@ import { useSearchParams } from "next/navigation"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { getActiveOfferForItem, getStoredOffers, type StoredOffer } from "@/lib/offer-utils"
 import { connectToItemUpdates } from "@/lib/item-realtime"
+import { shouldBypassImageOptimization } from "@/lib/image-utils"
 
 const categories = ["vehicles", "properties", "electronics", "clothing", "tools", "sports", "camping", "events"]
 
@@ -743,6 +744,8 @@ export default function BrowsePage() {
                           alt={item.name}
                           fill
                           className="object-cover rounded-t-lg"
+                          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
+                          unoptimized={shouldBypassImageOptimization(item.imageUrl)}
                         />
                         <button
                           onClick={(e) => {

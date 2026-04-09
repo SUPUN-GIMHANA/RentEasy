@@ -10,6 +10,7 @@ import { useSearchParams } from "next/navigation"
 import { BoostSelectionModal } from "@/components/boost-selection-modal"
 import { BoostPaymentModal } from "@/components/boost-payment-modal"
 import { api } from "@/lib/api-client"
+import { shouldBypassImageOptimization } from "@/lib/image-utils"
 
 const boostPlans = [
   {
@@ -251,6 +252,7 @@ export default function BoostAdvertisementPage() {
                         alt={boost.name}
                         fill
                         className="object-cover"
+                        unoptimized={shouldBypassImageOptimization(boost.image)}
                       />
                     </div>
                     <div className="flex-1">
@@ -299,6 +301,7 @@ export default function BoostAdvertisementPage() {
                     alt={item.name}
                     fill
                     className="object-cover"
+                    unoptimized={shouldBypassImageOptimization(item.imageUrl)}
                   />
                 </div>
                 <CardContent className="p-4">

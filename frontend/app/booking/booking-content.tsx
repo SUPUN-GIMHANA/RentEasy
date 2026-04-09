@@ -12,6 +12,7 @@ import { useAuth } from "@/lib/auth-context"
 import { api, ApiError } from "@/lib/api-client"
 import type { Booking } from "@/lib/types"
 import { safeJsonParse } from "@/lib/utils"
+import { shouldBypassImageOptimization } from "@/lib/image-utils"
 import { ArrowLeft, CalendarIcon, CreditCard, Landmark, Smartphone, Wallet } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
@@ -323,7 +324,7 @@ export function BookingContent() {
               <CardContent className="space-y-4">
                 <div className="flex gap-4">
                   <div className="relative w-20 h-20 rounded-lg overflow-hidden bg-muted shrink-0">
-                    <Image src={item.imageUrl || "/placeholder.svg"} alt={item.name} fill className="object-cover" />
+                    <Image src={item.imageUrl || "/placeholder.svg"} alt={item.name} fill className="object-cover" unoptimized={shouldBypassImageOptimization(item.imageUrl)} />
                   </div>
                   <div className="flex-1">
                     <h3 className="font-semibold line-clamp-2 text-sm">{item.name}</h3>

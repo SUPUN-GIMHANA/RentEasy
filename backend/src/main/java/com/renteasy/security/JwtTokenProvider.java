@@ -2,6 +2,7 @@ package com.renteasy.security;
 
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
+import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -22,6 +23,16 @@ public class JwtTokenProvider {
     
     @Value("${jwt.expiration}")
     private int jwtExpirationInMs;
+
+    @PostConstruct
+    public void validateJwtConfiguration() {
+        if (jwtSecret == null || jwtSecret.length() < 32) {
+            throw new IllegalStateException("JWT secret must be at least 32 characters long");
+        }
+        if (jwtExpirationInMs <= 0) {
+            throw new IllegalStateException("JWT expiration must be greater than 0");
+        }
+    }
     
     public String generateToken(Authentication authentication) {
         UserPrincipal userPrincipal = (UserPrincipal) authentication.getPrincipal();

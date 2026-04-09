@@ -15,6 +15,7 @@ import { api } from "@/lib/api-client"
 import { useAuth } from "@/lib/auth-context"
 import { saveStoredOffer } from "@/lib/offer-utils"
 import { safeJsonParse } from "@/lib/utils"
+import { shouldBypassImageOptimization } from "@/lib/image-utils"
 
 interface OfferItem {
   id: string
@@ -262,6 +263,7 @@ export default function AddOffersPage() {
                         alt={item.name}
                         fill
                         className="object-cover"
+                        unoptimized={shouldBypassImageOptimization(item.imageUrl)}
                       />
                     </div>
                     <div className="flex-1">

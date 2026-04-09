@@ -5,13 +5,13 @@ import com.renteasy.dto.BookingRequest;
 import com.renteasy.dto.BookingDTO;
 import com.renteasy.model.Booking;
 import com.renteasy.service.BookingService;
+import com.renteasy.util.SecurityUtils;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -28,7 +28,7 @@ public class BookingController {
     public ResponseEntity<?> createBooking(@Valid @RequestBody BookingRequest request,
                                           Authentication authentication) {
         try {
-            String userId = getUserIdFromAuthentication(authentication);
+            String userId = SecurityUtils.getCurrentUserId(authentication);
             Booking booking = bookingService.createBooking(request, userId);
             return ResponseEntity.status(HttpStatus.CREATED)
                 .body(new ApiResponse(true, "Booking created successfully", convertToDTO(booking)));
@@ -43,7 +43,7 @@ public class BookingController {
                                                  @RequestParam Booking.BookingStatus status,
                                                  Authentication authentication) {
         try {
-            String userId = getUserIdFromAuthentication(authentication);
+            String userId = SecurityUtils.getCurrentUserId(authentication);
             Booking booking = bookingService.updateBookingStatus(id, status, userId);
             return ResponseEntity.ok(new ApiResponse(true, "Booking status updated", convertToDTO(booking)));
         } catch (RuntimeException e) {
@@ -65,7 +65,7 @@ public class BookingController {
     
     @GetMapping("/my-bookings")
     public ResponseEntity<List<BookingDTO>> getMyBookings(Authentication authentication) {
-        String userId = getUserIdFromAuthentication(authentication);
+        String userId = SecurityUtils.getCurrentUserId(authentication);
         List<Booking> bookings = bookingService.getUserBookings(userId);
         return ResponseEntity.ok(bookings.stream().map(this::convertToDTO).collect(Collectors.toList()));
     }
@@ -75,7 +75,7 @@ public class BookingController {
             Authentication authentication,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
-        String userId = getUserIdFromAuthentication(authentication);
+        String userId = SecurityUtils.getCurrentUserId(authentication);
         Page<Booking> bookings = bookingService.getUserBookingsPaginated(userId, page, size);
         return ResponseEntity.ok(bookings.map(this::convertToDTO));
     }
@@ -88,14 +88,9 @@ public class BookingController {
     
     @GetMapping("/owner")
     public ResponseEntity<List<BookingDTO>> getOwnerBookings(Authentication authentication) {
-        String userId = getUserIdFromAuthentication(authentication);
+        String userId = SecurityUtils.getCurrentUserId(authentication);
         List<Booking> bookings = bookingService.getOwnerBookings(userId);
         return ResponseEntity.ok(bookings.stream().map(this::convertToDTO).collect(Collectors.toList()));
-    }
-    
-    private String getUserIdFromAuthentication(Authentication authentication) {
-        UserDetails userDetails = (UserDetails) authentication.getPrincipal();
-        return ((com.renteasy.security.UserPrincipal) userDetails).getId();
     }
     
     private BookingDTO convertToDTO(Booking booking) {
